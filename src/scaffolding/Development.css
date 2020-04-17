@@ -1,0 +1,38 @@
+body.natural .development #engine-container {
+  margin-top: 16px;
+  margin-left: 16px;
+  position: absolute;
+}
+
+.development .sidebar {
+  margin-left: 840px;
+  overflow: scroll;
+  box-sizing: border-box;
+  padding-bottom: 2em;
+  height: 100vh;
+}
+
+.development .sidebar > ul {
+  list-style-type: none;
+  padding: 0;
+  text-align: center;
+}
+
+.development .links {
+  margin-bottom: 0;
+}
+
+.development .links li {
+  display: inline-block;
+  margin-right: 0.5em;
+}
+
+.development .links li a {
+  text-decoration: none;
+  color: blue;
+}
+
+body.scaled .development .sidebar,
+body.scaled .development .Logging {
+  display: none;
+}

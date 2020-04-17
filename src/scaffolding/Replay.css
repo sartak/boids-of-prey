@@ -1,0 +1,145 @@
+.Replay {
+  user-select: none;
+  background: rgb(215, 215, 228);
+  width: auto !important;
+  min-width: 200px;
+  max-width: 600px;
+  margin-top: 8px;
+  margin-right: 8px;
+  border-radius: 8px;
+}
+
+.Replay .button {
+  cursor: pointer;
+  font-family: Apple Color Emoji;
+}
+
+.Replay .timeSight .repeat {
+  visibility: hidden;
+}
+
+.Replay .repeat-off.button {
+  opacity: 0.5;
+}
+
+.Replay .replays .replay .name {
+  cursor: pointer;
+}
+
+.Replay .controls {
+  border-top-left-radius: 8px;
+  border-top-right-radius: 8px;
+  padding: 8px;
+  text-align: center;
+  background: rgb(204, 204, 216);
+}
+
+.Replay .controls .button {
+  margin: 0 0.5em;
+}
+
+.Replay .controls .recording.button {
+  animation-name: recording;
+  animation-duration: 4s;
+  animation-direction: alternate;
+  animation-iteration-count: infinite;
+}
+
+@keyframes recording {
+  0% {
+    filter: sepia(100%) hue-rotate(290deg);
+  }
+  100% {
+    filter: sepia(100%) hue-rotate(290deg) brightness(80%);
+  }
+}
+
+.Replay .replays {
+  height: 160px;
+  overflow: scroll;
+  list-style-type: none;
+  padding: 8px 16px;
+  margin: 0;
+  border-bottom-left-radius: 8px;
+  border-bottom-right-radius: 8px;
+}
+
+.Replay .replays .replay {
+  padding: 0.12em 0;
+  display: flex;
+  align-items: center;
+}
+
+.Replay .replays .replay.editing .edit {
+  visibility: hidden !important;
+}
+
+.Replay .replays .replay .drag,
+.Replay .replays .replay .edit {
+  visibility: hidden;
+}
+
+.Replay .replays .replay .drag {
+  margin-right: 1em;
+  letter-spacing: -3px;
+  cursor: move;
+  font-weight: bold;
+  color: #aaaaaa;
+}
+
+.Replay .replays .replay.editing .name {
+  display: none;
+}
+
+.Replay .replays .replay:hover .drag,
+.Replay .replays .replay:hover .edit {
+  visibility: visible;
+}
+
+.Replay form {
+  display: block;
+  width: 100%;
+}
+
+.Replay form .DoubleEnder {
+  width: calc(100% - 50px);
+}
+
+.Replay .replays .replay .name,
+.Replay .replays .replay input {
+  margin: 0 0.5em;
+}
+
+.Replay.tweaking .fields {
+  display: block;
+  height: 25em;
+  overflow: scroll;
+}
+
+.Replay.tweaking label {
+  display: block;
+  text-align: center;
+}
+
+.Replay .fields {
+  padding: 1em;
+}
+
+.Replay textarea {
+  width: 100%;
+  height: 20em;
+  font-family: "Menlo", "Courier New", monospace;
+  font-size: 0.7em;
+}
+
+.Replay .field.changed textarea {
+  background: #FFFFEE;
+}
+
+.Replay .field.error textarea {
+  background: #FFEEEE;
+}
+
+.Replay .field.error .info {
+  color: red;
+}

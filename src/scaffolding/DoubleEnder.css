@@ -1,0 +1,78 @@
+.DoubleEnder {
+  position: relative;
+  display: inline-block;
+  min-width: 100px;
+  height: 16px;
+  margin: 2px 4px;
+}
+
+.DoubleEnder .track {
+  width: 100%;
+  margin-top: 8px;
+  height: 4px;
+  background: black;
+  border-radius: 4px;
+}
+
+.DoubleEnder .track.selected {
+  position: absolute;
+  margin-top: 0;
+  top: 8px;
+  z-index: 1;
+  width: auto;
+  background: #4397F7;
+}
+
+.DoubleEnder .track.highlighted {
+  position: absolute;
+  margin-top: 0;
+  top: 8px;
+  z-index: 2;
+  width: auto;
+  background: rgb(189, 93, 209);
+}
+
+.DoubleEnder .slider {
+  position: absolute;
+  top: 0;
+  left: 0;
+  border: 1px solid #000000;
+  height: 16px;
+  width: 16px;
+  border-radius: 16px;
+  background: #ffffff;
+  cursor: pointer;
+  box-shadow: 1px 1px 1px #000000, 0px 0px 1px #0d0d0d;
+}
+
+.DoubleEnder .slider.dragging {
+  background: #dddddd;
+}
+
+.DoubleEnder .notch {
+  display: block;
+  position: absolute;
+  top: 2px;
+  width: 3px;
+  z-index: 3;
+  border-radius: 4px;
+  height: 16px;
+  background-color: black;
+}
+
+.DoubleEnder .notch.selected {
+  background: #4397F7;
+}
+
+.DoubleEnder .notch.highlighted {
+  background: rgb(189, 93, 209);
+}
+
+.DoubleEnder .cursor {
+  position: absolute;
+  top: 6px;
+  width: 2px;
+  z-index: 6;
+  height: 8px;
+  background-color: rgb(189, 93, 209);
+}

@@ -1,0 +1,188 @@
+.Manage {
+  margin-top: 8px;
+  margin-right: 8px;
+  border-radius: 8px;
+  overflow: hidden;
+  width: auto !important;
+  min-width: 200px;
+  max-width: 600px;
+}
+
+.Manage .search {
+  box-sizing: border-box;
+  color: white;
+  background: #202020;
+  margin: 0;
+  border: 0;
+  padding: 4px;
+  border-top-right-radius: 8px;
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+.Manage .search::placeholder {
+  color: #aaa;
+}
+
+.Manage > .copy,
+.Manage > .reset {
+  display: none;
+  margin-left: 1em;
+  background: #f6c456;
+  color: black;
+  border-top-left-radius: 4px;
+  border-top-right-radius: 4px;
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+  padding: 4px;
+  border: none;
+}
+
+.Manage > .copy:hover,
+.Manage > .reset:hover {
+  cursor: pointer;
+  background: #f9d486;
+}
+
+body.changed-props .Manage > .copy,
+body.changed-props .Manage > .reset {
+  display: inline-block;
+}
+
+.Manage .dg input,
+.Manage .dg .slider {
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.Manage .dg.main {
+  width: 100% !important;
+  border-top-right-radius: 8px;
+  overflow: hidden;
+}
+
+.Manage .dg.main > .close-button {
+  display: none;
+}
+
+.Manage .dg .filtered {
+  display: none !important;
+}
+
+.Manage .dg .property-name {
+  width: 60%;
+}
+
+.Manage .dg .c {
+  width: 40%;
+}
+
+.Manage .dg {
+  position: relative;
+}
+
+.Manage .dg .property-name {
+  box-sizing: border-box;
+  padding-right: 31px;
+}
+
+.Manage .dg .disableable .property-name {
+  padding-right: 55px;
+}
+
+.Manage .dg .disableable .toggle {
+  position: absolute;
+  left: calc(60% - 55px);
+}
+
+.Manage .dg .disableable .toggle input {
+  cursor: pointer;
+}
+
+.Manage .dg .cr {
+  position: relative;
+}
+
+.Manage .dg .cr.listen {
+  color: #aaa;
+}
+
+.Manage .dg .cr.changed {
+  color: #f6c456;
+}
+
+.Manage .dg .cr .reset {
+  position: absolute;
+  left: calc(60% - 31px);
+  top: -1px;
+  visibility: hidden;
+}
+
+.Manage .dg .cr .reset input {
+  cursor: pointer;
+  background: #404040;
+  color: white;
+  border: none;
+  padding: 1px 4px;
+}
+
+.Manage .dg .cr .reset input:hover {
+  background: #606060;
+}
+
+.Manage .dg .cr.boolean .reset {
+  display: none;
+}
+
+.Manage .dg .cr.changed .reset {
+  visibility: visible;
+}
+
+.Manage .dg .cr.listen.function,
+.Manage .dg .cr.listen.function .property-name,
+.Manage .dg .cr.listen.function *,
+.Manage .dg .cr.listen.boolean,
+.Manage .dg .cr.listen.boolean * {
+  cursor: default;
+}
+
+.Manage .dg .cr.listen input,
+.Manage .dg .cr.listen select {
+  pointer-events: none;
+}
+
+.Manage .dg .cr.boolean div {
+  display: flex;
+}
+
+.Manage .dg .cr.boolean .property-name {
+  width: 100%;
+}
+
+.Manage .dg .cr.boolean .c {
+  width: auto;
+  margin-right: 4px;
+}
+
+.Manage .dg li:not(.folder):nth-child(even) {
+  background: #202020;
+}
+
+.Manage .dg .cr.function:not(.listen):hover,
+.Manage .dg .cr.boolean:not(.listen):hover {
+  background: #3c3c3c !important;
+}
+
+.Manage .dg li.cr.listen:not(.folder):hover {
+  background: #1a1a1a;
+}
+
+.Manage .dg li.cr.listen:not(.folder):nth-child(even):hover {
+  background: #202020;
+}
+
+.Manage .dg .closed li:not(.title),
+.Manage .dg .closed ul li,
+.Manage .dg .closed ul li > * {
+  display: none; /* significant perf boost; Chrome avoids rendering */
+}
