@@ -4,6 +4,7 @@ import analytics from './scaffolding/lib/analytics';
 import {
   Distance, NormalizeVector, TowardCentroid, AvoidObjects,
   AvoidObject, AvoidClosestObject, SeekClosestObject,
+  ClosestObject,
 } from './vector';
 
 const FAR_EDGE = 'FAR_EDGE';
@@ -61,7 +62,7 @@ export default class PlayScene extends SuperScene {
 
     this.level.player = this.createPlayer();
     this.level.followers = this.createFollowers();
-    this.level.enemies = this.createEnemies();
+    this.level.enemies = this.createEnemies(true);
     this.level.boundary = this.createBoundary();
 
     this.setupPhysics();
@@ -208,6 +209,7 @@ export default class PlayScene extends SuperScene {
       follower.setDamping(true);
       follower.setFriction(friction);
       follower.setMaxVelocity(maxVelocity);
+      follower.targetMaxVelocity = maxVelocity;
       follower.setCircle(radius);
       follower.isFollower = true;
 
@@ -220,47 +222,50 @@ export default class PlayScene extends SuperScene {
     return followers;
   }
 
-  createEnemies() {
+  createEnemies(defer) {
     const {level} = this;
-    const {tileHeight, tileWidth} = this.game.config;
-    const halfWidth = tileWidth / 2;
-    const halfHeight = tileHeight / 2;
+    const enemyGroup = level.enemyGroup || this.physics.add.group({key: 'enemies'});
+    const enemies = level.enemies || [];
 
-    const enemyGroup = this.physics.add.group({key: 'enemies'});
+    if (!defer) {
+      const {tileHeight, tileWidth} = this.game.config;
+      const halfWidth = tileWidth / 2;
+      const halfHeight = tileHeight / 2;
 
-    const mass = prop('enemy.mass');
-    const bounce = prop('enemy.bounce');
-    const drag = prop('enemy.drag');
-    const friction = prop('enemy.friction');
-    const maxVelocity = prop('enemy.maxVelocity');
-    const radius = (halfWidth + halfHeight) / 2;
 
-    const enemies = [];
+      const mass = prop('enemy.mass');
+      const bounce = prop('enemy.bounce');
+      const drag = prop('enemy.drag');
+      const friction = prop('enemy.friction');
+      const maxVelocity = prop('enemy.maxVelocity');
+      const radius = (halfWidth + halfHeight) / 2;
 
-    Object.entries(tileDefinitions).forEach(([glyph, spec]) => {
-      if (!spec.enemy) {
-        return;
-      }
-      const tiles = level.mapLookups[glyph] || [];
-      const e = tiles.map((tile) => {
-        const [xCoord, yCoord] = this.positionToScreenCoordinate(tile.x, tile.y);
+      Object.entries(tileDefinitions).forEach(([glyph, spec]) => {
+        if (!spec.enemy) {
+          return;
+        }
+        const tiles = level.mapLookups[glyph] || [];
+        const e = tiles.map((tile) => {
+          const [xCoord, yCoord] = this.positionToScreenCoordinate(tile.x, tile.y);
 
-        const enemy = enemyGroup.create(xCoord + halfWidth, yCoord + halfHeight, spec.enemy);
+          const enemy = enemyGroup.create(xCoord + halfWidth, yCoord + halfHeight, spec.enemy);
 
-        enemy.body.setMass(mass);
-        enemy.setBounce(bounce);
-        enemy.setDrag(drag);
-        enemy.setDamping(true);
-        enemy.setFriction(friction);
-        enemy.setMaxVelocity(maxVelocity);
-        enemy.setCircle(radius);
-        enemy.isEnemy = true;
+          enemy.body.setMass(mass);
+          enemy.setBounce(bounce);
+          enemy.setDrag(drag);
+          enemy.setDamping(true);
+          enemy.setFriction(friction);
+          enemy.setMaxVelocity(maxVelocity);
+          enemy.targetMaxVelocity = maxVelocity;
+          enemy.setCircle(radius);
+          enemy.isEnemy = true;
 
-        return enemy;
+          return enemy;
+        });
+
+        enemies.push(...e);
       });
-
-      enemies.push(...e);
-    });
+    }
 
     level.enemies = enemies;
     level.enemyGroup = enemyGroup;
@@ -402,6 +407,7 @@ export default class PlayScene extends SuperScene {
 
     let ax = 0;
     let ay = 0;
+    let stickInput = false;
 
     if (command.up.held) {
       ay = -1;
@@ -417,15 +423,25 @@ export default class PlayScene extends SuperScene {
 
     if (command.lstick.held) {
       [ax, ay] = command.lstick.held;
+      stickInput = true;
     } else if (command.rstick.held) {
       [ax, ay] = command.rstick.held;
+      stickInput = true;
+    }
+
+    if (stickInput) {
+      if (Math.abs(ax) > 0.9) {
+        ax = ax < 0 ? -1 : 1;
+        ay = 0;
+      } else if (Math.abs(ay) > 0.9) {
+        ay = ay < 0 ? -1 : 1;
+        ax = 0;
+      }
     }
 
     if (ax || ay) {
       if (ax && ay) {
         [ax, ay] = NormalizeVector(ax, ay);
-        // ax *= Math.SQRT1_2;
-        // ay *= Math.SQRT1_2;
       }
       const accel = prop('player.acceleration');
       player.body.setAcceleration(ax * accel, ay * accel);
@@ -467,6 +483,154 @@ export default class PlayScene extends SuperScene {
     this.processInput();
     this.flockFollowers();
     this.flockEnemies();
+    this.zoomOnLoss();
+    this.updateVelocities(time, dt);
+
+    if (!this.spawnedEnemies && prop('shader.night.amount') > 0.99) {
+      this.createEnemies();
+      this.spawnedEnemies = true;
+    }
+  }
+
+  zoomOnLoss() {
+    const {level} = this;
+    const {enemies, followers, player} = level;
+    const {tileWidth} = this.game.config;
+
+    if (followers.length !== 1) {
+      return;
+    }
+
+    const minDistance = prop('effects.zoomOnLoss.distance');
+
+    let isSafe = false;
+    let min;
+
+    if (enemies.length === 0) {
+      isSafe = true;
+    } else {
+      for (let f = 0; f < followers.length; f += 1) {
+        const follower = followers[f];
+        const [enemy, distance] = ClosestObject(enemies, follower.x, follower.y);
+        const effectiveDistance = Math.max(0.01, distance - tileWidth);
+        if (this.losing) {
+          if (effectiveDistance > 2 * minDistance) {
+            isSafe = true;
+            break;
+          }
+        } else if (effectiveDistance > minDistance) {
+          isSafe = true;
+          break;
+        }
+
+        if (!min || effectiveDistance < min[0]) {
+          min = [effectiveDistance, follower, enemy];
+        }
+      }
+    }
+
+    if (!min || isSafe) {
+      this.level.losing = null;
+      if (!this.level.zoomedForLoss || this.level.unzoomForLoss) {
+        return;
+      }
+
+      this.level.unzoomForLoss = true;
+      this.level.zoomedForLoss = false;
+
+      this.unzoomStartTimer = this.timer(() => {
+        if (this.level.zoomedForLoss) {
+          return;
+        }
+
+        this.camera.zoomTo(
+          1,
+          prop('effects.zoomOnLoss.recover_zoom_duration'),
+          prop('effects.zoomOnLoss.recover_zoom_ease'),
+          true,
+        );
+        this.camera.pan(
+          player.x,
+          player.y,
+          prop('effects.zoomOnLoss.recover_pan_duration'),
+          prop('effects.zoomOnLoss.recover_pan_ease'),
+          true,
+          () => {
+            this.cameraFollow(player);
+            // this.setCameraDeadzone();
+          },
+        ).ignoresScenePause = true;
+
+        const originTimeScale = prop('effects.zoomOnLoss.time_scale');
+        this.unzoomTimeScaleTween = this.tweenPercent(
+          prop('effects.zoomOnLoss.recover_time_scale_duration'),
+          (factor) => {
+            this.timeScale = factor + originTimeScale * (1.0 - factor);
+          },
+          null,
+          0,
+          prop('effects.zoomOnLoss.recover_time_scale_ease'),
+        );
+        this.unzoomTimeScaleTween.timeScale = 1;
+      }, prop('effects.zoomOnLoss.recover_linger_duration'));
+    } else {
+      const [, follower] = min;
+      this.level.losing = min;
+      this.level.unzoomForLoss = false;
+      if (this.unzoomTimeScaleTween) {
+        this.unzoomTimeScaleTween.stop();
+      }
+
+      if (!this.level.zoomedForLoss) {
+        this.pauseEverythingForTransition();
+        this.level.zoomedForLoss = true;
+        this.cameraFollow();
+        const panDuration = prop('effects.zoomOnLoss.pan_duration');
+        const zoomDuration = prop('effects.zoomOnLoss.zoom_duration');
+
+        this.camera.setDeadzone(0, 0);
+        this.camera.pan(
+          follower.x,
+          follower.y,
+          panDuration,
+          prop('effects.zoomOnLoss.pan_ease'),
+          true,
+        ).ignoresScenePause = true;
+
+        this.camera.zoomTo(
+          prop('effects.zoomOnLoss.zoom_scale'),
+          zoomDuration,
+          prop('effects.zoomOnLoss.zoom_ease'),
+          true,
+        ).ignoresScenePause = true;
+
+        this.timer(() => {
+          this.timeScale = prop('effects.zoomOnLoss.time_scale');
+          this.unpauseEverythingForTransition();
+        }, Math.max(panDuration, zoomDuration)).ignoresScenePause = true;
+      }
+    }
+  }
+
+  updateVelocities(time, dt) {
+    const {level} = this;
+    const {followers, enemies} = level;
+
+    const followerLerp = prop('follower.velocityLerp');
+    followers.forEach((follower) => {
+      const v = follower.body.maxVelocity.x;
+      const t = follower.targetMaxVelocity;
+
+      follower.setMaxVelocity(v + followerLerp * (t - v) * (dt / 16));
+    });
+
+    const enemyLerp = prop('follower.velocityLerp');
+    enemies.forEach((enemy) => {
+      const v = enemy.body.maxVelocity.x;
+      const t = enemy.targetMaxVelocity;
+
+      enemy.setMaxVelocity(v + enemyLerp * (t - v) * (dt / 16));
+    });
   }
 
   followersNearPoint(x, y, r) {
@@ -489,7 +653,9 @@ export default class PlayScene extends SuperScene {
     const px = player.x;
     const py = player.y;
 
-    const acceleration = prop('follower.flockAcceleration');
+    let acceleration = prop('follower.flockAcceleration');
+    let maxVelocity = prop('follower.maxVelocity');
+
     const cohereRadius = prop('follower.cohereRadius');
     const cohereFactor = prop('follower.cohereFactor');
     const spreadRadius = prop('follower.spreadRadius');
@@ -502,6 +668,8 @@ export default class PlayScene extends SuperScene {
     const enemyRadius = prop('follower.enemyRadius');
     const killerFactor = prop('follower.killerFactor');
     const killerRadius = prop('follower.killerRadius');
+    const killerAcceleration = prop('follower.killerAcceleration');
+    const killerVelocity = prop('follower.killerVelocity');
 
     followers.forEach((follower) => {
       const fx = follower.x;
@@ -568,6 +736,8 @@ export default class PlayScene extends SuperScene {
         if (es.length > 0) {
           const v = AvoidClosestObject(es, fx, fy);
           if (v) {
+            acceleration += killerAcceleration;
+            maxVelocity += killerVelocity;
             targetX += v[0] * killerFactor;
             targetY += v[1] * killerFactor;
             hasFocus = true;
@@ -581,6 +751,7 @@ export default class PlayScene extends SuperScene {
       } else {
         follower.body.setAcceleration(0, 0);
       }
+      follower.targetMaxVelocity = maxVelocity;
     });
   }
 
@@ -591,7 +762,9 @@ export default class PlayScene extends SuperScene {
     const px = player.x;
     const py = player.y;
 
-    const acceleration = prop('enemy.flockAcceleration');
+    let acceleration = prop('enemy.flockAcceleration');
+    let maxVelocity = prop('enemy.maxVelocity');
+
     const cohereRadius = prop('enemy.cohereRadius');
     const cohereFactor = prop('enemy.cohereFactor');
     const spreadRadius = prop('enemy.spreadRadius');
@@ -606,6 +779,8 @@ export default class PlayScene extends SuperScene {
     const followerRadius = prop('enemy.followerRadius');
     const victimFactor = prop('enemy.victimFactor');
     const victimRadius = prop('enemy.victimRadius');
+    const victimAcceleration = prop('enemy.victimAcceleration');
+    const victimVelocity = prop('enemy.victimVelocity');
 
     enemies.forEach((enemy) => {
       const fx = enemy.x;
@@ -684,6 +859,8 @@ export default class PlayScene extends SuperScene {
         if (fs.length > 0) {
           const v = SeekClosestObject(fs, fx, fy);
           if (v) {
+            acceleration += victimAcceleration;
+            maxVelocity += victimVelocity;
             targetX += v[0] * victimFactor;
             targetY += v[1] * victimFactor;
             hasFocus = true;
@@ -697,6 +874,7 @@ export default class PlayScene extends SuperScene {
       } else {
         enemy.body.setAcceleration(0, 0);
       }
+      enemy.targetMaxVelocity = maxVelocity;
     });
   }
 

@@ -115,6 +115,21 @@ export const AvoidClosestObject = (os, x, y) => {
   return [tx / d, ty / d];
 };
 
+export const ClosestObject = (os, x, y) => {
+  let min;
+
+  os.forEach((o) => {
+    const dx = o.x - x;
+    const dy = o.y - y;
+    const d = Distance(dx, dy);
+
+    if (!min || d < min[1]) {
+      min = [o, d];
+    }
+  });
+  return min;
+};
+
 export const SeekClosestObject = (os, x, y) => {
   let min;
 

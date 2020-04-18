@@ -44,6 +44,13 @@ export const commands = {
     joystick: true,
   },
 
+  restart: {
+    input: ['keyboard.R'],
+    execute: (scene) => scene.replaceWithSelf(),
+    debug: true,
+    unignorable: true,
+    unreplayable: true,
+  },
   quit: {
     input: ['keyboard.Q'],
     execute: 'forceQuit',
@@ -74,35 +81,40 @@ export const commands = {
   },
 };
 
-export const shaderCoordFragments = [
+export const shaderCoordFragments = null;
+/*
+[
   'shockwave',
 
-  /*
-  ['foo', {
-    bar: ['float', 0, null],
-    baz: ['vec2', [0.5, 0.5], null],
-    quux: ['float', 10.0, 0, 500],
-    blang: ['bool', true],
-  }, `
-      ux.x += 0.0 + foo_bar;
-      ux.y += 0.0 + foo_baz.x;
-  `],
-  */
+  // ['foo', {
+  //   bar: ['float', 0, null],
+  //   baz: ['vec2', [0.5, 0.5], null],
+  //   quux: ['float', 10.0, 0, 500],
+  //   blang: ['bool', true],
+  // }, `
+  //     ux.x += 0.0 + foo_bar;
+  //     ux.y += 0.0 + foo_baz.x;
+  // `],
 ];
+*/
 
 export const shaderColorFragments = [
   'blur',
-  'tint',
 
-  /*
-  ['blah', {
-    color: ['rgba', [1, 1, 1, 1]],
+  ['night', {
+    color: ['rgb', [205 / 255, 67 / 255, 67 / 255]],
+    alpha_factor: ['float', 0.31, 0, 1, 0.01],
+    tint_factor: ['float', 0.36, 0, 1, 0.01],
+    amount: ['float', 0, 0, 1, 0.01],
   }, `
-      c.r *= blah_color.r * blah_color.a;
-      c.g *= blah_color.g * blah_color.a;
-      c.b *= blah_color.b * blah_color.a;
+      c.r = c.r * (1.0 - night_alpha_factor) + c.r * night_alpha_factor * (1.0 - night_amount);
+      c.g = c.g * (1.0 - night_alpha_factor) + c.g * night_alpha_factor * (1.0 - night_amount);
+      c.b = c.b * (1.0 - night_alpha_factor) + c.b * night_alpha_factor * (1.0 - night_amount);
+
+      c.r = c.r + night_amount * night_tint_factor * night_color.r;
+      c.g = c.g + night_amount * night_tint_factor * night_color.g;
+      c.b = c.b + night_amount * night_tint_factor * night_color.b;
   `],
-  */
 ];
 
 export const propSpecs = {
@@ -143,6 +155,7 @@ export const propSpecs = {
   'follower.friction': [1, 0, 100, (value, scene) => scene.level.followers.forEach((f) => f.setFriction(value))],
   'follower.bounce': [1, 0, 100, (value, scene) => scene.level.followers.forEach((f) => f.setBounce(value))],
   'follower.maxVelocity': [50, 0, 1000, (value, scene) => scene.level.followers.forEach((f) => f.setMaxVelocity(value))],
+  'follower.velocityLerp': [0.2, 0, 1],
   'follower.flockAcceleration': [75, 0, 1000],
   'follower.cohereRadius': [1000, 0, 1000],
   'follower.cohereFactor': [1, 0, 100],
@@ -152,16 +165,19 @@ export const propSpecs = {
   'follower.playerFactor': [4, 0, 100],
   'follower.obstacleRadius': [100, 0, 1000],
   'follower.obstacleFactor': [1000, 0, 1000],
-  'follower.killerRadius': [200, 0, 1000],
-  'follower.killerFactor': [4, 0, 100],
   'follower.enemyRadius': [200, 0, 1000],
   'follower.enemyFactor': [4, 0, 100],
+  'follower.killerRadius': [200, 0, 1000],
+  'follower.killerFactor': [4, 0, 100],
+  'follower.killerAcceleration': [100, 0, 1000],
+  'follower.killerVelocity': [100, 0, 1000],
 
   'enemy.mass': [1, 0, 100, (value, scene) => scene.level.enemies.forEach((f) => f.body.setMass(value))],
   'enemy.drag': [0.95, 0, 1, (value, scene) => scene.level.enemies.forEach((f) => f.setDrag(value))],
   'enemy.friction': [1, 0, 100, (value, scene) => scene.level.enemies.forEach((f) => f.setFriction(value))],
   'enemy.bounce': [1, 0, 100, (value, scene) => scene.level.enemies.forEach((f) => f.setBounce(value))],
   'enemy.maxVelocity': [100, 0, 1000, (value, scene) => scene.level.enemies.forEach((f) => f.setMaxVelocity(value))],
+  'enemy.velocityLerp': [0.2, 0, 1],
   'enemy.flockAcceleration': [1000, 0, 10000],
   'enemy.cohereRadius': [1000, 0, 1000],
   'enemy.cohereFactor': [20, 0, 100],
@@ -173,15 +189,32 @@ export const propSpecs = {
   'enemy.seekPlayerFactor': [1, 0, 100],
   'enemy.obstacleRadius': [80, 0, 1000],
   'enemy.obstacleFactor': [1000, 0, 1000],
-  'enemy.victimRadius': [300, 0, 1000],
-  'enemy.victimFactor': [700, 0, 1000],
   'enemy.followerRadius': [1000, 0, 1000],
   'enemy.followerFactor': [25, 0, 1000],
+  'enemy.victimRadius': [300, 0, 1000],
+  'enemy.victimFactor': [700, 0, 1000],
+  'enemy.victimAcceleration': [100, 0, 1000],
+  'enemy.victimVelocity': [100, 0, 1000],
 
   'effects.sceneTransition.transition': [{
     animation: 'pushLeft',
     ease: 'Cubic.easeInOut',
   }],
+
+  'effects.zoomOnLoss.distance': [15, 0, 1000],
+  'effects.zoomOnLoss.pan_duration': [1000, 0, 1000],
+  'effects.zoomOnLoss.pan_ease': ['Cubic.easeInOut', tweenEases],
+  'effects.zoomOnLoss.zoom_duration': [1000, 0, 1000],
+  'effects.zoomOnLoss.zoom_ease': ['Cubic.easeInOut', tweenEases],
+  'effects.zoomOnLoss.zoom_scale': [1.2, 0, 10],
+  'effects.zoomOnLoss.time_scale': [0.1, 0, 1],
+  'effects.zoomOnLoss.recover_linger_duration': [100, 0, 10000],
+  'effects.zoomOnLoss.recover_zoom_duration': [500, 0, 10000],
+  'effects.zoomOnLoss.recover_zoom_ease': ['Cubic.easeInOut', tweenEases],
+  'effects.zoomOnLoss.recover_pan_duration': [500, 0, 10000],
+  'effects.zoomOnLoss.recover_pan_ease': ['Cubic.easeInOut', tweenEases],
+  'effects.zoomOnLoss.recover_time_scale_duration': [100, 0, 10000],
+  'effects.zoomOnLoss.recover_time_scale_ease': ['Cubic.easeInOut', tweenEases],
 };
 
 propSpecs['scene.camera.lerp'][0] = 0.05;
