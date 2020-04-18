@@ -47,7 +47,30 @@ export default class PlayScene extends SuperScene {
   setupAnimations() {
   }
 
+  musicName() {
+  }
+
+  firstUpdate(time, dt) {
+    super.firstUpdate(time, dt);
+  }
+
   fixedUpdate(time, dt) {
+  }
+
+  willTransitionTo(newScene, transition) {
+    super.willTransitionTo(newScene, transition);
+  }
+
+  willTransitionFrom(oldScene, transition) {
+    super.willTransitionFrom(oldScene, transition);
+  }
+
+  didTransitionTo(newScene, transition) {
+    super.didTransitionTo(newScene, transition);
+  }
+
+  didTransitionFrom(oldScene, transition) {
+    super.didTransitionFrom(oldScene, transition);
   }
 
   launchTimeSight() {

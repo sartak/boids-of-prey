@@ -4,6 +4,8 @@ import proxyClass from './scaffolding/lib/proxy';
 import PlayScene from './play-scene';
 
 const baseConfig = {
+  tileWidth: 24,
+  tileHeight: 24,
 };
 
 export default class Game extends SuperGame {
