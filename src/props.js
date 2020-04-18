@@ -13,6 +13,18 @@ export const commands = {
     input: ['keyboard.Z', 'keyboard.SPACE', 'gamepad.A', 'gamepad.B', 'gamepad.X', 'gamepad.Y'],
   },
   */
+  up: {
+    input: ['keyboard.UP', 'gamepad.UP'],
+  },
+  down: {
+    input: ['keyboard.DOWN', 'gamepad.DOWN'],
+  },
+  left: {
+    input: ['keyboard.LEFT', 'gamepad.LEFT'],
+  },
+  right: {
+    input: ['keyboard.RIGHT', 'gamepad.RIGHT'],
+  },
 
   quit: {
     input: ['keyboard.Q'],
@@ -84,12 +96,15 @@ export const propSpecs = {
 };
 
 export const tileDefinitions = {
-  '.': null, // background
-  /*
-  '#': {
-    image: 'tileWall',
-    group: 'ground',
+  '.': {
+    image: 'tileGrass',
+    group: 'grass',
   },
+  '@': {
+    image: 'tileGrass',
+    group: 'grass',
+  },
+  /*
   '{': {
     _inherit: '#',
     leftEdge: true,

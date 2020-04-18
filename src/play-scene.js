@@ -43,7 +43,36 @@ export default class PlayScene extends SuperScene {
   create(config) {
     super.create(config);
 
-    this.physics.add.sprite(0, 0 /* , 'spriteName' */ );
+    this.loadLevel('test');
+  }
+
+  loadLevel(id) {
+    const level = super.loadLevel(id);
+    const {tileWidth, tileHeight} = this.game.config;
+
+    level.map.forEach((row, y) => {
+      row.forEach((tile, x) => {
+        tile.object = this.add.image(x * tileWidth, y * tileHeight, tile.image);
+      });
+    });
+
+    this.level = level;
+
+    this.level.player = this.createPlayer();
+
+    return level;
+  }
+
+  createPlayer() {
+    const {level} = this;
+    const tile = level.mapLookups['@'][0];
+    const {tileWidth, tileHeight} = this.game.config;
+
+    const player = this.physics.add.sprite(tileWidth * tile.x, tileHeight * tile.y, 'spriteThing');
+
+    this.cameraFollow(player);
+
+    return player;
   }
 
   setupAnimations() {
@@ -56,7 +85,26 @@ export default class PlayScene extends SuperScene {
     super.firstUpdate(time, dt);
   }
 
+  processInput(time, dt) {
+    const {command, level} = this;
+    const {player} = level;
+
+    if (command.up.held) {
+      player.y -= 1;
+    }
+    if (command.down.held) {
+      player.y += 1;
+    }
+    if (command.right.held) {
+      player.x += 1;
+    }
+    if (command.left.held) {
+      player.x -= 1;
+    }
+  }
+
   fixedUpdate(time, dt) {
+    this.processInput();
   }
 
   willTransitionTo(newScene, transition) {
