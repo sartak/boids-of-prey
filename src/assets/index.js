@@ -3,7 +3,7 @@
 import spriteFollower from './tile/follower.png';
 import spriteThing from './tile/thing.png';
 import tileGrass from './tile/grass.png';
-import tileGrassRock from './tile/grass.png';
+import tileGrassRock from './tile/grassrock.png';
 
 export const imageAssets = {
   tileGrass,

@@ -92,17 +92,35 @@ export const propSpecs = {
 
   // 'command.ignore_all.intro': [false, null, (scene) => scene.command.ignoreAll(scene, 'intro')],
   // 'rules.base_gravity': [400, 0, 1000],
-  // 'level.name': ['', null],
+
+  'level.id': ['', null],
+  'level.width': [0, null],
+  'level.height': [0, null],
+
+  'player.x': [0.1, null, 'level.player.x'],
+  'player.y': [0.1, null, 'level.player.y'],
+
+  'effects.sceneTransition.transition': [{
+    animation: 'pushLeft',
+    ease: 'Cubic.easeInOut',
+  }],
 };
 
 export const tileDefinitions = {
   '.': {
     image: 'tileGrass',
-    group: 'grass',
   },
   '@': {
     image: 'tileGrass',
-    group: 'grass',
+  },
+  '*': {
+    image: 'tileGrassRock',
+    group: 'rock',
+    isStatic: true,
+  },
+  ',': {
+    image: 'tileGrass',
+    group: 'transition',
   },
   /*
   '{': {
