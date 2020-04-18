@@ -122,8 +122,31 @@ export const propSpecs = {
   'follower.playerFactor': [4, 0, 100],
   'follower.obstacleRadius': [100, 0, 1000],
   'follower.obstacleFactor': [1000, 0, 1000],
+  'follower.killerRadius': [200, 0, 1000],
+  'follower.killerFactor': [4, 0, 100],
   'follower.enemyRadius': [200, 0, 1000],
   'follower.enemyFactor': [4, 0, 100],
+
+  'enemy.mass': [1, 0, 100, (value, scene) => scene.level.enemies.forEach((f) => f.body.setMass(value))],
+  'enemy.drag': [0.95, 0, 1, (value, scene) => scene.level.enemies.forEach((f) => f.setDrag(value))],
+  'enemy.friction': [1, 0, 100, (value, scene) => scene.level.enemies.forEach((f) => f.setFriction(value))],
+  'enemy.bounce': [1, 0, 100, (value, scene) => scene.level.enemies.forEach((f) => f.setBounce(value))],
+  'enemy.maxVelocity': [100, 0, 1000, (value, scene) => scene.level.enemies.forEach((f) => f.setMaxVelocity(value))],
+  'enemy.flockAcceleration': [150, 0, 1000],
+  'enemy.cohereRadius': [1000, 0, 1000],
+  'enemy.cohereFactor': [1, 0, 100],
+  'enemy.spreadRadius': [100, 0, 1000],
+  'enemy.spreadFactor': [40, 0, 100],
+  'enemy.avoidPlayerRadius': [100, 0, 1000],
+  'enemy.avoidPlayerFactor': [500, 0, 100],
+  'enemy.seekPlayerRadius': [1000, 0, 1000],
+  'enemy.seekPlayerFactor': [1, 0, 100],
+  'enemy.obstacleRadius': [50, 0, 1000],
+  'enemy.obstacleFactor': [1000, 0, 1000],
+  'enemy.victimRadius': [200, 0, 1000],
+  'enemy.victimFactor': [700, 0, 1000],
+  'enemy.followerRadius': [1000, 0, 1000],
+  'enemy.followerFactor': [25, 0, 1000],
 
   'effects.sceneTransition.transition': [{
     animation: 'pushLeft',
@@ -158,6 +181,10 @@ export const tileDefinitions = {
   '+': {
     image: 'tileGrass',
     // followers
+  },
+  A: {
+    image: 'tileGrass',
+    enemy: 'spriteEnemyA',
   },
   /*
   '{': {

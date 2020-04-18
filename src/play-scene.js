@@ -1,7 +1,10 @@
-import Phaser from 'phaser';
 import SuperScene from './scaffolding/SuperScene';
 import prop, {tileDefinitions} from './props';
 import analytics from './scaffolding/lib/analytics';
+import {
+  Distance, NormalizeVector, TowardCentroid, AvoidObjects,
+  AvoidObject, AvoidClosestObject, SeekClosestObject,
+} from './vector';
 
 const FAR_EDGE = 'FAR_EDGE';
 
@@ -58,6 +61,7 @@ export default class PlayScene extends SuperScene {
 
     this.level.player = this.createPlayer();
     this.level.followers = this.createFollowers();
+    this.level.enemies = this.createEnemies();
     this.level.boundary = this.createBoundary();
 
     this.setupPhysics();
@@ -212,17 +216,66 @@ export default class PlayScene extends SuperScene {
     return followers;
   }
 
+  createEnemies() {
+    const {level} = this;
+    const {tileHeight, tileWidth} = this.game.config;
+    const halfWidth = tileWidth / 2;
+    const halfHeight = tileHeight / 2;
+
+    const enemyGroup = this.physics.add.group({key: 'enemies'});
+
+    const mass = prop('enemy.mass');
+    const bounce = prop('enemy.bounce');
+    const drag = prop('enemy.drag');
+    const friction = prop('enemy.friction');
+    const maxVelocity = prop('enemy.maxVelocity');
+    const radius = (halfWidth + halfHeight) / 2;
+
+    const enemies = [];
+
+    Object.entries(tileDefinitions).forEach(([glyph, spec]) => {
+      if (!spec.enemy) {
+        return;
+      }
+      const tiles = level.mapLookups[glyph] || [];
+      const e = tiles.map((tile) => {
+        const [xCoord, yCoord] = this.positionToScreenCoordinate(tile.x, tile.y);
+
+        const enemy = enemyGroup.create(xCoord + halfWidth, yCoord + halfHeight, spec.enemy);
+
+        enemy.body.setMass(mass);
+        enemy.setBounce(bounce);
+        enemy.setDrag(drag);
+        enemy.setDamping(true);
+        enemy.setFriction(friction);
+        enemy.setMaxVelocity(maxVelocity);
+        enemy.setCircle(radius);
+        enemy.isEnemy = true;
+
+        return enemy;
+      });
+
+      enemies.push(...e);
+    });
+
+    level.enemies = enemies;
+    level.enemyGroup = enemyGroup;
+
+    return enemies;
+  }
+
   setupAnimations() {
   }
 
   setupPhysics() {
     const {level, physics} = this;
     const {
-      player, groups, followerGroup, boundary,
+      player, groups, followerGroup, enemyGroup, boundary,
     } = level;
 
     physics.add.overlap(player, groups.transition.group, this.enteredTransition, null, this);
     physics.add.collider(player, groups.rock.group);
+    physics.add.overlap(player, enemyGroup, this.playerKillEnemy, null, this);
 
     physics.add.collider(followerGroup, player);
     physics.add.collider(followerGroup, groups.rock.group);
@@ -230,6 +283,24 @@ export default class PlayScene extends SuperScene {
     physics.add.collider(followerGroup, boundary);
     // not needed because world collide
     // physics.add.collider(followerGroup, groups.transition.group);
+
+    physics.add.collider(enemyGroup, player);
+    physics.add.collider(enemyGroup, groups.rock.group);
+    physics.add.collider(enemyGroup, enemyGroup);
+    physics.add.collider(enemyGroup, boundary);
+    physics.add.overlap(enemyGroup, followerGroup, this.enemyKillFollower, null, this);
+  }
+
+  enemyKillFollower(enemy, follower) {
+    const {level} = this;
+    level.followers = level.followers.filter((f) => f !== follower);
+    follower.destroy();
+  }
+
+  playerKillEnemy(player, enemy) {
+    const {level} = this;
+    level.enemies = level.enemies.filter((f) => f !== enemy);
+    enemy.destroy();
   }
 
   enteredTransition(player, transition) {
@@ -355,6 +426,7 @@ export default class PlayScene extends SuperScene {
   fixedUpdate(time, dt) {
     this.processInput();
     this.flockFollowers();
+    this.flockEnemies();
   }
 
   followersNearPoint(x, y, r) {
@@ -368,11 +440,6 @@ export default class PlayScene extends SuperScene {
 
   obstaclesNearPoint(x, y, r) {
     return this.physics.overlapRect(x - r / 2, y - r / 2, r, r, false, true).map((body) => body.gameObject).filter((object) => object.tile && object.tile.isObstacle);
-  }
-
-  normalizeVector(dx, dy) {
-    const d = Math.sqrt(dx ** 2 + dy ** 2); // fffs
-    return [dx / d, dy / d];
   }
 
   avoidVector(objects, ox, oy, r) {
@@ -400,7 +467,21 @@ export default class PlayScene extends SuperScene {
     x /= count;
     x /= count;
 
-    return this.normalizeVector(x, y);
+    return NormalizeVector(x, y);
+  }
+
+  avoidObject(object, ox, oy, r) {
+    const dx = object.x - ox;
+    const dy = object.y - oy;
+    const d = Math.sqrt(dx ** 2 + dy ** 2);
+    if (d > r) {
+      return;
+    }
+
+    const x = dx / (d ** 2);
+    const y = dy / (d ** 2);
+
+    return NormalizeVector(x, y);
   }
 
   flockFollowers() {
@@ -412,8 +493,8 @@ export default class PlayScene extends SuperScene {
 
     const acceleration = prop('follower.flockAcceleration');
     const cohereRadius = prop('follower.cohereRadius');
-    const spreadRadius = prop('follower.spreadRadius');
     const cohereFactor = prop('follower.cohereFactor');
+    const spreadRadius = prop('follower.spreadRadius');
     const spreadFactor = prop('follower.spreadFactor');
     const playerFactor = prop('follower.playerFactor');
     const playerRadius = prop('follower.playerRadius');
@@ -421,74 +502,78 @@ export default class PlayScene extends SuperScene {
     const obstacleRadius = prop('follower.obstacleRadius');
     const enemyFactor = prop('follower.enemyFactor');
     const enemyRadius = prop('follower.enemyRadius');
+    const killerFactor = prop('follower.killerFactor');
+    const killerRadius = prop('follower.killerRadius');
 
     followers.forEach((follower) => {
       const fx = follower.x;
       const fy = follower.y;
-      const cohereFollowers = this.followersNearPoint(fx, fy, cohereRadius);
 
       let hasFocus = false;
       let targetX = 0;
       let targetY = 0;
 
-      {
-        const playerDX = px - fx;
-        const playerDY = py - fy;
-        const d = Math.sqrt(playerDX ** 2 + playerDY ** 2);
-        const [playerX, playerY] = [playerDX / d, playerDY / d];
+      if (playerFactor > 0) {
+        const dx = px - fx;
+        const dy = py - fy;
+        const d = Distance(dx, dy);
         if (d < playerRadius) {
-          targetX += playerX * playerFactor;
-          targetY += playerY * playerFactor;
+          targetX += (dx / d) * playerFactor;
+          targetY += (dy / d) * playerFactor;
           hasFocus = true;
         }
       }
 
-      if (cohereFollowers.length > 1) {
-        let cx = 0;
-        let cy = 0;
-        cohereFollowers.forEach((f) => {
-          cx += f.x - fx;
-          cy += f.y - fy;
-        });
-        cx /= cohereFollowers.length;
-        cy /= cohereFollowers.length;
-
-        const [cohereX, cohereY] = this.normalizeVector(cx, cy);
-        targetX += cohereX * cohereFactor;
-        targetY += cohereY * cohereFactor;
-        hasFocus = true;
-      }
-
-      {
-        const spreadFollowers = cohereRadius > spreadRadius ? cohereFollowers : this.followersNearPoint(fx, fy, spreadRadius);
-        const spreadVector = this.avoidVector([player, ...spreadFollowers.filter((s) => s !== follower)], fx, fy, spreadRadius);
-        if (spreadVector) {
-          const [x, y] = this.normalizeVector(...spreadVector);
-          targetX += x * spreadFactor;
-          targetY += y * spreadFactor;
+      if (cohereFactor > 0) {
+        const fs = this.followersNearPoint(fx, fy, cohereRadius);
+        if (fs.length > 1) {
+          const [x, y] = TowardCentroid(fs, fx, fy);
+          targetX += x * cohereFactor;
+          targetY += y * cohereFactor;
           hasFocus = true;
         }
       }
 
-      {
-        const obstacles = this.obstaclesNearPoint(fx, fy, obstacleRadius);
-        const obstacleVector = this.avoidVector(obstacles, fx, fy, obstacleRadius);
-        if (obstacleVector) {
-          const [x, y] = this.normalizeVector(...obstacleVector);
-          targetX += x * obstacleFactor;
-          targetY += y * obstacleFactor;
+      if (spreadFactor > 0) {
+        const fs = this.followersNearPoint(fx, fy, spreadRadius);
+        const os = [player, ...fs.filter((f) => f !== follower)];
+        const v = AvoidObjects(os, fx, fy, spreadRadius);
+        if (v) {
+          targetX += v[0] * spreadFactor;
+          targetY += v[1] * spreadFactor;
           hasFocus = true;
         }
       }
 
-      {
-        const enemies = this.enemiesNearPoint(fx, fy, enemyRadius);
-        const enemyVector = this.avoidVector(enemies, fx, fy, enemyRadius);
-        if (enemyVector) {
-          const [x, y] = this.normalizeVector(...enemyVector);
-          targetX += x * enemyFactor;
-          targetY += y * enemyFactor;
+      if (obstacleFactor > 0) {
+        const os = this.obstaclesNearPoint(fx, fy, obstacleRadius);
+        const v = AvoidObjects(os, fx, fy, obstacleRadius);
+        if (v) {
+          targetX += v[0] * obstacleFactor;
+          targetY += v[1] * obstacleFactor;
           hasFocus = true;
+        }
+      }
+
+      if (enemyFactor > 0) {
+        const es = this.enemiesNearPoint(fx, fy, enemyRadius);
+        const v = AvoidObjects(es, fx, fy, enemyRadius);
+        if (v) {
+          targetX += v[0] * enemyFactor;
+          targetY += v[1] * enemyFactor;
+          hasFocus = true;
+        }
+      }
+
+      if (killerFactor > 0) {
+        const es = this.enemiesNearPoint(fx, fy, killerRadius);
+        if (es.length > 0) {
+          const v = AvoidClosestObject(es, fx, fy);
+          if (v) {
+            targetX += v[0] * killerFactor;
+            targetY += v[1] * killerFactor;
+            hasFocus = true;
+          }
         }
       }
 
@@ -497,6 +582,122 @@ export default class PlayScene extends SuperScene {
         follower.body.setAcceleration(acceleration * Math.cos(theta), acceleration * Math.sin(theta));
       } else {
         follower.body.setAcceleration(0, 0);
+      }
+    });
+  }
+
+  flockEnemies() {
+    const {level} = this;
+    const {followers, enemies, player} = level;
+
+    const px = player.x;
+    const py = player.y;
+
+    const acceleration = prop('enemy.flockAcceleration');
+    const cohereRadius = prop('enemy.cohereRadius');
+    const cohereFactor = prop('enemy.cohereFactor');
+    const spreadRadius = prop('enemy.spreadRadius');
+    const spreadFactor = prop('enemy.spreadFactor');
+    const avoidPlayerFactor = prop('enemy.avoidPlayerFactor');
+    const avoidPlayerRadius = prop('enemy.avoidPlayerRadius');
+    const seekPlayerFactor = prop('enemy.seekPlayerFactor');
+    const seekPlayerRadius = prop('enemy.seekPlayerRadius');
+    const obstacleFactor = prop('enemy.obstacleFactor');
+    const obstacleRadius = prop('enemy.obstacleRadius');
+    const followerFactor = prop('enemy.followerFactor');
+    const followerRadius = prop('enemy.followerRadius');
+    const victimFactor = prop('enemy.victimFactor');
+    const victimRadius = prop('enemy.victimRadius');
+
+    enemies.forEach((enemy) => {
+      const fx = enemy.x;
+      const fy = enemy.y;
+
+      let hasFocus = false;
+      let targetX = 0;
+      let targetY = 0;
+
+      if (avoidPlayerFactor > 0) {
+        const v = AvoidObject(player, fx, fy, avoidPlayerRadius);
+        if (v) {
+          targetX += v[0] * avoidPlayerFactor;
+          targetY += v[1] * avoidPlayerFactor;
+          hasFocus = true;
+        }
+      }
+
+      if (seekPlayerFactor > 0) {
+        const dx = px - fx;
+        const dy = py - fy;
+        const d = Distance(dx, dy);
+        if (d < seekPlayerRadius) {
+          targetX += (dx / d) * seekPlayerFactor;
+          targetY += (dy / d) * seekPlayerFactor;
+          hasFocus = true;
+        }
+      }
+
+      if (cohereFactor > 0) {
+        const fs = this.enemiesNearPoint(fx, fy, cohereRadius);
+        if (fs.length > 1) {
+          const [x, y] = TowardCentroid(fs, fx, fy);
+          targetX += x * cohereFactor;
+          targetY += y * cohereFactor;
+          hasFocus = true;
+        }
+      }
+
+      if (spreadFactor > 0) {
+        const es = this.enemiesNearPoint(fx, fy, spreadRadius).filter((e) => e !== enemy);
+        if (es.length) {
+          const v = AvoidObjects(es, fx, fy, spreadRadius);
+          if (v) {
+            targetX += v[0] * spreadFactor;
+            targetY += v[1] * spreadFactor;
+            hasFocus = true;
+          }
+        }
+      }
+
+      if (obstacleFactor > 0) {
+        const os = this.obstaclesNearPoint(fx, fy, obstacleRadius);
+        const v = AvoidObjects(os, fx, fy, obstacleRadius);
+        if (v) {
+          targetX += v[0] * obstacleFactor;
+          targetY += v[1] * obstacleFactor;
+          hasFocus = true;
+        }
+      }
+
+      if (followerFactor > 0) {
+        const fs = this.followersNearPoint(fx, fy, followerRadius);
+        if (fs.length) {
+          const v = TowardCentroid(fs, fx, fy, followerRadius);
+          if (v) {
+            targetX += v[0] * followerFactor;
+            targetY += v[1] * followerFactor;
+            hasFocus = true;
+          }
+        }
+      }
+
+      if (victimFactor > 0) {
+        const fs = this.followersNearPoint(fx, fy, victimRadius);
+        if (fs.length > 0) {
+          const v = SeekClosestObject(fs, fx, fy);
+          if (v) {
+            targetX += v[0] * victimFactor;
+            targetY += v[1] * victimFactor;
+            hasFocus = true;
+          }
+        }
+      }
+
+      if (hasFocus) {
+        const theta = Math.atan2(targetY, targetX);
+        enemy.body.setAcceleration(acceleration * Math.cos(theta), acceleration * Math.sin(theta));
+      } else {
+        enemy.body.setAcceleration(0, 0);
       }
     });
   }
