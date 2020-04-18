@@ -1,3 +1,4 @@
+import Phaser from 'phaser';
 import SuperScene from './scaffolding/SuperScene';
 import prop, {tileDefinitions} from './props';
 import analytics from './scaffolding/lib/analytics';
@@ -57,6 +58,7 @@ export default class PlayScene extends SuperScene {
 
     this.level.player = this.createPlayer();
     this.level.followers = this.createFollowers();
+    this.level.boundary = this.createBoundary();
 
     this.setupPhysics();
 
@@ -109,6 +111,28 @@ export default class PlayScene extends SuperScene {
         tile.object = object;
       });
     });
+  }
+
+  createBoundary() {
+    const {level} = this;
+    const {width: levelWidth, height: levelHeight} = level;
+    const {tileWidth, tileHeight} = this.game.config;
+
+    const boundary = this.physics.add.staticGroup({key: 'boundary'});
+
+    const bw = tileWidth * 10;
+    const bh = tileHeight * 10;
+
+    const top = [-bw / 2, -bw, levelWidth + bw, bh];
+    const bottom = [-bw / 2, levelHeight, levelWidth + bw, bh];
+    const left = [-bw, -bh / 2, bw, levelHeight + bh];
+    const right = [levelWidth, -bh / 2, bw, levelHeight + bh];
+    [bottom, left, right, top].forEach(([x, y, w, h]) => {
+      const border = this.add.rectangle(x + w * 0.5, y + h * 0.5, w, h);
+      boundary.add(border);
+    });
+
+    return boundary;
   }
 
   createPlayer() {
@@ -176,7 +200,6 @@ export default class PlayScene extends SuperScene {
       follower.setDamping(true);
       follower.setFriction(friction);
       follower.setMaxVelocity(maxVelocity);
-      follower.setCollideWorldBounds(true);
       follower.setCircle(radius);
       follower.isFollower = true;
 
@@ -194,7 +217,9 @@ export default class PlayScene extends SuperScene {
 
   setupPhysics() {
     const {level, physics} = this;
-    const {player, groups, followerGroup} = level;
+    const {
+      player, groups, followerGroup, boundary,
+    } = level;
 
     physics.add.overlap(player, groups.transition.group, this.enteredTransition, null, this);
     physics.add.collider(player, groups.rock.group);
@@ -202,6 +227,7 @@ export default class PlayScene extends SuperScene {
     physics.add.collider(followerGroup, player);
     physics.add.collider(followerGroup, groups.rock.group);
     physics.add.collider(followerGroup, followerGroup);
+    physics.add.collider(followerGroup, boundary);
     // not needed because world collide
     // physics.add.collider(followerGroup, groups.transition.group);
   }
@@ -299,23 +325,29 @@ export default class PlayScene extends SuperScene {
     const {command, level} = this;
     const {player} = level;
 
-    const accel = prop('player.acceleration');
     let ax = 0;
     let ay = 0;
 
     if (command.up.held) {
-      ay = -accel;
+      ay = -1;
     } else if (command.down.held) {
-      ay = accel;
+      ay = 1;
     }
 
     if (command.right.held) {
-      ax = accel;
+      ax = 1;
     } else if (command.left.held) {
-      ax = -accel;
+      ax = -1;
     }
 
-    player.body.setAcceleration(ax, ay);
+    if (ax || ay) {
+      [ax, ay] = this.normalizeVector(ax, ay);
+
+      const accel = prop('player.acceleration');
+      player.body.setAcceleration(ax * accel, ay * accel);
+    } else {
+      player.body.setAcceleration(0, 0);
+    }
   }
 
   fixedUpdate(time, dt) {
@@ -328,8 +360,13 @@ export default class PlayScene extends SuperScene {
     return this.physics.overlapRect(x - r / 2, y - r / 2, r, r, true, false).map((body) => body.gameObject).filter((object) => object.isFollower);
   }
 
+  normalizeVector(dx, dy) {
+    const d = Math.sqrt(dx ** 2 + dy ** 2); // fffs
+    return [dx / d, dy / d];
+  }
+
   flockFollowers() {
-    const {level, physics} = this;
+    const {level} = this;
     const {followers, player} = level;
 
     const px = player.x;
@@ -338,67 +375,88 @@ export default class PlayScene extends SuperScene {
     const acceleration = prop('follower.flockAcceleration');
     const cohereRadius = prop('follower.cohereRadius');
     const spreadRadius = prop('follower.spreadRadius');
+    const cohereFactor = prop('follower.cohereFactor');
+    const spreadFactor = prop('follower.spreadFactor');
+    const playerFactor = prop('follower.playerFactor');
+    const playerRadius = prop('follower.playerRadius');
 
     followers.forEach((follower) => {
       const fx = follower.x;
       const fy = follower.y;
-
-      let tx;
-      let ty;
-
       const cohereFollowers = this.followersNearPoint(fx, fy, cohereRadius);
 
-      const playerDistance = Math.sqrt((px - fx) ** 2 + (py - fy) ** 2);
-      if (playerDistance < cohereRadius) {
-        tx = px;
-        ty = py;
-      } else {
-        // overlapCirc was added in a newer version of phaser
+      let hasFocus = false;
+      let targetX = 0;
+      let targetY = 0;
+
+      {
+        const playerDX = px - fx;
+        const playerDY = py - fy;
+        const d = Math.sqrt(playerDX ** 2 + playerDY ** 2);
+        const [playerX, playerY] = [playerDX / d, playerDY / d];
+        if (d < playerRadius) {
+          targetX += playerX * playerFactor;
+          targetY += playerY * playerFactor;
+          hasFocus = true;
+        }
+      }
+
+      if (cohereFollowers.length > 1) {
         let cx = 0;
         let cy = 0;
         cohereFollowers.forEach((f) => {
-          cx += f.x;
-          cy += f.y;
+          cx += f.x - fx;
+          cy += f.y - fy;
         });
         cx /= cohereFollowers.length;
         cy /= cohereFollowers.length;
-        tx = cx;
-        ty = cy;
+
+        const [cohereX, cohereY] = this.normalizeVector(cx, cy);
+        targetX += cohereX * cohereFactor;
+        targetY += cohereY * cohereFactor;
+        hasFocus = true;
       }
 
-      let spreadX = 0;
-      let spreadY = 0;
-      let spreadCount = 0;
+      {
+        let spreadX = 0;
+        let spreadY = 0;
+        let spreadCount = 0;
 
-      const spreadFollowers = cohereRadius > spreadRadius ? cohereFollowers : this.followersNearPoint(fx, fy, spreadRadius);
-      spreadFollowers.forEach((f) => {
-        if (f === follower) {
-          return;
+        const spreadFollowers = cohereRadius > spreadRadius ? cohereFollowers : this.followersNearPoint(fx, fy, spreadRadius);
+        [...spreadFollowers, player].forEach((f) => {
+          if (f === follower) {
+            return;
+          }
+
+          const dx = fx - f.x;
+          const dy = fy - f.y;
+          const fDistance = Math.sqrt(dx ** 2 + dy ** 2);
+          if (fDistance > spreadRadius) {
+            return;
+          }
+
+          spreadX += dx / (fDistance ** 2);
+          spreadY += dy / (fDistance ** 2);
+          spreadCount += 1;
+        });
+
+        if (spreadCount) {
+          spreadX /= spreadCount;
+          spreadY /= spreadCount;
+
+          [spreadX, spreadY] = this.normalizeVector(spreadX, spreadY);
+          targetX += spreadX * spreadFactor;
+          targetY += spreadY * spreadFactor;
+          hasFocus = true;
         }
-
-        const dx = fx - f.x;
-        const dy = fy - f.y;
-        const fDistance = Math.sqrt(dx ** 2 + dy ** 2);
-        if (fDistance > spreadRadius) {
-          return;
-        }
-
-        spreadX += dx / fDistance;
-        spreadY += dy / fDistance;
-        spreadCount += 1;
-      });
-
-      const targetTheta = Math.atan2(ty - fy, tx - fx);
-      let theta = targetTheta;
-
-      if (spreadCount) {
-        spreadX /= spreadCount;
-        spreadY /= spreadCount;
-
-        theta = targetTheta * 0.5 + Math.atan2(spreadY, spreadX) * 0.5;
       }
 
-      follower.body.setAcceleration(acceleration * Math.cos(theta), acceleration * Math.sin(theta));
+      if (hasFocus) {
+        const theta = Math.atan2(targetY, targetX);
+        follower.body.setAcceleration(acceleration * Math.cos(theta), acceleration * Math.sin(theta));
+      } else {
+        follower.body.setAcceleration(0, 0);
+      }
     });
   }
 
@@ -459,6 +517,6 @@ export default class PlayScene extends SuperScene {
   }
 
   _hot() {
-    // this._hotReloadCurrentLevel();
+    this._hotReloadCurrentLevel();
   }
 }
