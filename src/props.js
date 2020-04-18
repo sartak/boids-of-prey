@@ -115,11 +115,15 @@ export const propSpecs = {
   'follower.maxVelocity': [50, 0, 1000, (value, scene) => scene.level.followers.forEach((f) => f.setMaxVelocity(value))],
   'follower.flockAcceleration': [75, 0, 1000],
   'follower.cohereRadius': [1000, 0, 1000],
-  'follower.cohereFactor': [1, 0, 10, 0.01],
+  'follower.cohereFactor': [1, 0, 100],
   'follower.spreadRadius': [100, 0, 1000],
-  'follower.spreadFactor': [8, 0, 10, 0.01],
-  'follower.playerRadius': [200, 0, 1000],
-  'follower.playerFactor': [4, 0, 10, 0.01],
+  'follower.spreadFactor': [20, 0, 100],
+  'follower.playerRadius': [300, 0, 1000],
+  'follower.playerFactor': [4, 0, 100],
+  'follower.obstacleRadius': [100, 0, 1000],
+  'follower.obstacleFactor': [1000, 0, 1000],
+  'follower.enemyRadius': [200, 0, 1000],
+  'follower.enemyFactor': [4, 0, 100],
 
   'effects.sceneTransition.transition': [{
     animation: 'pushLeft',
@@ -143,11 +147,13 @@ export const tileDefinitions = {
     group: 'rock',
     isStatic: true,
     isCircle: true,
+    isObstacle: true,
   },
   ',': {
     image: 'tileGrass',
     group: 'transition',
     isStatic: true, // for followers
+    isObstacle: true, // for followers
   },
   '+': {
     image: 'tileGrass',

@@ -341,8 +341,10 @@ export default class PlayScene extends SuperScene {
     }
 
     if (ax || ay) {
-      [ax, ay] = this.normalizeVector(ax, ay);
-
+      if (ax && ay) {
+        ax *= Math.SQRT1_2;
+        ay *= Math.SQRT1_2;
+      }
       const accel = prop('player.acceleration');
       player.body.setAcceleration(ax * accel, ay * accel);
     } else {
@@ -360,9 +362,45 @@ export default class PlayScene extends SuperScene {
     return this.physics.overlapRect(x - r / 2, y - r / 2, r, r, true, false).map((body) => body.gameObject).filter((object) => object.isFollower);
   }
 
+  enemiesNearPoint(x, y, r) {
+    return this.physics.overlapRect(x - r / 2, y - r / 2, r, r, true, false).map((body) => body.gameObject).filter((object) => object.isEnemy);
+  }
+
+  obstaclesNearPoint(x, y, r) {
+    return this.physics.overlapRect(x - r / 2, y - r / 2, r, r, false, true).map((body) => body.gameObject).filter((object) => object.tile && object.tile.isObstacle);
+  }
+
   normalizeVector(dx, dy) {
     const d = Math.sqrt(dx ** 2 + dy ** 2); // fffs
     return [dx / d, dy / d];
+  }
+
+  avoidVector(objects, ox, oy, r) {
+    let x = 0;
+    let y = 0;
+    let count = 0;
+
+    objects.forEach((object) => {
+      const dx = ox - object.x;
+      const dy = oy - object.y;
+      const d = Math.sqrt(dx ** 2 + dy ** 2);
+      if (d > r) {
+        return;
+      }
+
+      x += dx / (d ** 2);
+      y += dy / (d ** 2);
+      count += 1;
+    });
+
+    if (count === 0) {
+      return null;
+    }
+
+    x /= count;
+    x /= count;
+
+    return this.normalizeVector(x, y);
   }
 
   flockFollowers() {
@@ -379,6 +417,10 @@ export default class PlayScene extends SuperScene {
     const spreadFactor = prop('follower.spreadFactor');
     const playerFactor = prop('follower.playerFactor');
     const playerRadius = prop('follower.playerRadius');
+    const obstacleFactor = prop('follower.obstacleFactor');
+    const obstacleRadius = prop('follower.obstacleRadius');
+    const enemyFactor = prop('follower.enemyFactor');
+    const enemyRadius = prop('follower.enemyRadius');
 
     followers.forEach((follower) => {
       const fx = follower.x;
@@ -418,35 +460,34 @@ export default class PlayScene extends SuperScene {
       }
 
       {
-        let spreadX = 0;
-        let spreadY = 0;
-        let spreadCount = 0;
-
         const spreadFollowers = cohereRadius > spreadRadius ? cohereFollowers : this.followersNearPoint(fx, fy, spreadRadius);
-        [...spreadFollowers, player].forEach((f) => {
-          if (f === follower) {
-            return;
-          }
+        const spreadVector = this.avoidVector([player, ...spreadFollowers.filter((s) => s !== follower)], fx, fy, spreadRadius);
+        if (spreadVector) {
+          const [x, y] = this.normalizeVector(...spreadVector);
+          targetX += x * spreadFactor;
+          targetY += y * spreadFactor;
+          hasFocus = true;
+        }
+      }
 
-          const dx = fx - f.x;
-          const dy = fy - f.y;
-          const fDistance = Math.sqrt(dx ** 2 + dy ** 2);
-          if (fDistance > spreadRadius) {
-            return;
-          }
+      {
+        const obstacles = this.obstaclesNearPoint(fx, fy, obstacleRadius);
+        const obstacleVector = this.avoidVector(obstacles, fx, fy, obstacleRadius);
+        if (obstacleVector) {
+          const [x, y] = this.normalizeVector(...obstacleVector);
+          targetX += x * obstacleFactor;
+          targetY += y * obstacleFactor;
+          hasFocus = true;
+        }
+      }
 
-          spreadX += dx / (fDistance ** 2);
-          spreadY += dy / (fDistance ** 2);
-          spreadCount += 1;
-        });
-
-        if (spreadCount) {
-          spreadX /= spreadCount;
-          spreadY /= spreadCount;
-
-          [spreadX, spreadY] = this.normalizeVector(spreadX, spreadY);
-          targetX += spreadX * spreadFactor;
-          targetY += spreadY * spreadFactor;
+      {
+        const enemies = this.enemiesNearPoint(fx, fy, enemyRadius);
+        const enemyVector = this.avoidVector(enemies, fx, fy, enemyRadius);
+        if (enemyVector) {
+          const [x, y] = this.normalizeVector(...enemyVector);
+          targetX += x * enemyFactor;
+          targetY += y * enemyFactor;
           hasFocus = true;
         }
       }
