@@ -5,7 +5,7 @@ import {
 import {tweenEases} from './scaffolding/lib/tweens';
 
 const particleImages = [
-  '',
+  'imageCloud',
 ];
 
 export const commands = {
@@ -233,6 +233,11 @@ export const propSpecs = {
   'effects.zoomOnLoss.recover_time_scale_ease': ['Cubic.easeInOut', tweenEases],
 
   'effects.followerDie.duration': [100, 0, 10000],
+
+  'effects.dashPuff.particles': [{
+    frequency: 50,
+    lifespan: 500,
+  }],
 };
 
 propSpecs['scene.camera.lerp'][0] = 0.05;

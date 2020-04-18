@@ -176,7 +176,11 @@ export default class PlayScene extends SuperScene {
 
     player.dash = {
       active: false,
+      ax: 0,
+      ay: 0,
     };
+
+    player.children = [];
 
     this.cameraFollow(player);
 
@@ -413,6 +417,69 @@ export default class PlayScene extends SuperScene {
     super.firstUpdate(time, dt);
   }
 
+  dash(ax, ay) {
+    const {level} = this;
+    const {player} = level;
+    const {tileWidth, tileHeight} = this.game.config;
+
+    player.dash.active = true;
+    player.dash.ax = ax;
+    player.dash.ay = ay;
+
+    const [dx, dy] = NormalizeVector(ax, ay);
+
+    const normalVelocity = prop('player.maxVelocity');
+    const dashVelocity = prop('player.dash.velocity');
+
+    let dashEmitter;
+    let dashCallback;
+    this.particleSystem(
+      'effects.dashPuff',
+      {
+        scale: {start: 0.5, end: 0},
+        alpha: {start: 1, end: 0},
+        onAdd: (particles, emitter) => {
+          dashEmitter = emitter;
+          emitter.x.propertyValue = player.x + tileWidth * dy;
+          emitter.y.propertyValue = player.y + tileHeight * dy;
+          dashCallback = (x, y) => {
+            emitter.x.propertyValue = x + tileWidth / 2 * -dx;
+            emitter.y.propertyValue = y + tileHeight / 2 * -dy;
+          };
+          player.children.push(dashCallback);
+        },
+      },
+    );
+
+    this.tweenSustainExclusive(
+      'dashTimer',
+      prop('player.dash.in_duration'),
+      prop('player.dash.sustain_duration'),
+      prop('player.dash.out_duration'),
+      (factor) => {
+        const v = normalVelocity + factor * (dashVelocity - normalVelocity);
+        player.setMaxVelocity(v);
+      },
+      null,
+      () => {
+        player.dash.ax = null;
+        player.dash.ay = null;
+        dashEmitter.stop();
+        player.children = player.children.filter((c) => c !== dashCallback);
+      },
+      () => {
+        player.dash.active = false;
+        player.dash.cooldown = true;
+
+        this.timer(() => {
+          player.dash.cooldown = false;
+        }, prop('player.dash.cooldown_duration'));
+      },
+      prop('player.dash.in_ease'),
+      prop('player.dash.out_ease'),
+    );
+  }
+
   processInput(time, dt) {
     const {command, level} = this;
     const {player} = level;
@@ -451,6 +518,11 @@ export default class PlayScene extends SuperScene {
       }
     }
 
+    if (player.dash.ax) {
+      ax = 0.1 * ax + 0.9 * player.dash.ax;
+      ay = 0.1 * ay + 0.9 * player.dash.ay;
+    }
+
     if (ax || ay) {
       if (ax && ay) {
         [ax, ay] = NormalizeVector(ax, ay);
@@ -462,32 +534,12 @@ export default class PlayScene extends SuperScene {
     }
 
     if (command.dash.started && !player.dash.active && !player.dash.cooldown) {
-      player.dash.active = true;
-      const normalVelocity = prop('player.maxVelocity');
-      const dashVelocity = prop('player.dash.velocity');
-
-      this.tweenSustainExclusive(
-        'dashTimer',
-        prop('player.dash.in_duration'),
-        prop('player.dash.sustain_duration'),
-        prop('player.dash.out_duration'),
-        (factor) => {
-          const v = normalVelocity + factor * (dashVelocity - normalVelocity);
-          player.setMaxVelocity(v);
-        },
-        null,
-        null,
-        () => {
-          player.dash.active = false;
-          player.dash.cooldown = true;
-
-          this.timer(() => {
-            player.dash.cooldown = false;
-          }, prop('player.dash.cooldown_duration'));
-        },
-        prop('player.dash.in_ease'),
-        prop('player.dash.out_ease'),
-      );
+      // TODO facing direction
+      if (!ax && !ay) {
+        ax = 1;
+        ay = 0;
+      }
+      this.dash(ax, ay);
     }
   }
 
@@ -497,12 +549,27 @@ export default class PlayScene extends SuperScene {
     this.flockEnemies();
     this.zoomOnLoss();
     this.updateVelocities(time, dt);
+    this.moveChildren();
 
     this['night_amount'] = 1;
     if (!this.spawnedEnemies && this['night_amount'] > 0.99) {
       this.createEnemies();
       this.spawnedEnemies = true;
     }
+  }
+
+  moveChildren() {
+    const {level} = this;
+    const {player} = level;
+
+    player.children.forEach((object) => {
+      if (typeof object === 'function') {
+        object(player.x, player.y);
+      } else {
+        object.x = player.x;
+        object.y = player.y;
+      }
+    });
   }
 
   zoomOnLoss() {
