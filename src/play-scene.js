@@ -53,6 +53,7 @@ export default class PlayScene extends SuperScene {
     super.create(config);
 
     this.loadLevel(config.levelId || 'test');
+    this.flock_amount = 0;
   }
 
   loadLevel(id) {
@@ -217,6 +218,7 @@ export default class PlayScene extends SuperScene {
     });
 
     level.followers = followers;
+    level.followerCount = followers.length;
     level.followerGroup = followerGroup;
 
     return followers;
@@ -304,6 +306,16 @@ export default class PlayScene extends SuperScene {
     const {level} = this;
     level.followers = level.followers.filter((f) => f !== follower);
     follower.destroy();
+
+    const reduction = 1 / level.followerCount;
+    let prevFactor = 0;
+    this.tweenPercent(
+      prop('effects.followerDie.duration'),
+      (factor) => {
+        this.flock_amount += (factor - prevFactor) * reduction;
+        prevFactor = factor;
+      },
+    );
   }
 
   playerKillEnemy(player, enemy) {
@@ -486,7 +498,8 @@ export default class PlayScene extends SuperScene {
     this.zoomOnLoss();
     this.updateVelocities(time, dt);
 
-    if (!this.spawnedEnemies && prop('shader.night.amount') > 0.99) {
+    this['night_amount'] = 1;
+    if (!this.spawnedEnemies && this['night_amount'] > 0.99) {
       this.createEnemies();
       this.spawnedEnemies = true;
     }
@@ -557,6 +570,7 @@ export default class PlayScene extends SuperScene {
           true,
           () => {
             this.cameraFollow(player);
+            this.camera.useBounds = true;
             // this.setCameraDeadzone();
           },
         ).ignoresScenePause = true;
@@ -584,11 +598,12 @@ export default class PlayScene extends SuperScene {
       if (!this.level.zoomedForLoss) {
         this.pauseEverythingForTransition();
         this.level.zoomedForLoss = true;
-        this.cameraFollow();
         const panDuration = prop('effects.zoomOnLoss.pan_duration');
         const zoomDuration = prop('effects.zoomOnLoss.zoom_duration');
 
         this.camera.setDeadzone(0, 0);
+        this.cameraFollow();
+        this.camera.useBounds = false;
         this.camera.pan(
           follower.x,
           follower.y,
@@ -935,6 +950,6 @@ export default class PlayScene extends SuperScene {
   }
 
   _hot() {
-    this._hotReloadCurrentLevel();
+    // this._hotReloadCurrentLevel();
   }
 }

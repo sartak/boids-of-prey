@@ -105,7 +105,7 @@ export const shaderColorFragments = [
     color: ['rgb', [205 / 255, 67 / 255, 67 / 255]],
     alpha_factor: ['float', 0.31, 0, 1, 0.01],
     tint_factor: ['float', 0.36, 0, 1, 0.01],
-    amount: ['float', 0, 0, 1, 0.01],
+    amount: ['float', 0, null],
   }, `
       c.r = c.r * (1.0 - night_alpha_factor) + c.r * night_alpha_factor * (1.0 - night_amount);
       c.g = c.g * (1.0 - night_alpha_factor) + c.g * night_alpha_factor * (1.0 - night_amount);
@@ -114,6 +114,22 @@ export const shaderColorFragments = [
       c.r = c.r + night_amount * night_tint_factor * night_color.r;
       c.g = c.g + night_amount * night_tint_factor * night_color.g;
       c.b = c.b + night_amount * night_tint_factor * night_color.b;
+  `],
+
+  ['flock', {
+    color: ['rgb', [1, 1, 1]],
+    alpha_factor: ['float', 0.11, 0, 1, 0.01],
+    tint_factor: ['float', 0.15, 0, 1, 0.01],
+    amount: ['float', 0, null],
+    // amount: ['float', 0, 0, 1, 0.01],
+  }, `
+      c.r = c.r * (1.0 - flock_alpha_factor) + c.r * flock_alpha_factor * (1.0 - flock_amount);
+      c.g = c.g * (1.0 - flock_alpha_factor) + c.g * flock_alpha_factor * (1.0 - flock_amount);
+      c.b = c.b * (1.0 - flock_alpha_factor) + c.b * flock_alpha_factor * (1.0 - flock_amount);
+
+      c.r = c.r + flock_amount * flock_tint_factor * flock_color.r;
+      c.g = c.g - flock_amount * flock_tint_factor * flock_color.g;
+      c.b = c.b - flock_amount * flock_tint_factor * flock_color.b;
   `],
 ];
 
@@ -160,7 +176,7 @@ export const propSpecs = {
   'follower.cohereRadius': [1000, 0, 1000],
   'follower.cohereFactor': [1, 0, 100],
   'follower.spreadRadius': [100, 0, 1000],
-  'follower.spreadFactor': [20, 0, 100],
+  'follower.spreadFactor': [15, 0, 100],
   'follower.playerRadius': [300, 0, 1000],
   'follower.playerFactor': [4, 0, 100],
   'follower.obstacleRadius': [100, 0, 1000],
@@ -168,9 +184,9 @@ export const propSpecs = {
   'follower.enemyRadius': [200, 0, 1000],
   'follower.enemyFactor': [4, 0, 100],
   'follower.killerRadius': [200, 0, 1000],
-  'follower.killerFactor': [4, 0, 100],
-  'follower.killerAcceleration': [100, 0, 1000],
-  'follower.killerVelocity': [100, 0, 1000],
+  'follower.killerFactor': [200, 0, 1000],
+  'follower.killerAcceleration': [1000, 0, 1000],
+  'follower.killerVelocity': [20, 0, 1000],
 
   'enemy.mass': [1, 0, 100, (value, scene) => scene.level.enemies.forEach((f) => f.body.setMass(value))],
   'enemy.drag': [0.95, 0, 1, (value, scene) => scene.level.enemies.forEach((f) => f.setDrag(value))],
@@ -178,11 +194,11 @@ export const propSpecs = {
   'enemy.bounce': [1, 0, 100, (value, scene) => scene.level.enemies.forEach((f) => f.setBounce(value))],
   'enemy.maxVelocity': [100, 0, 1000, (value, scene) => scene.level.enemies.forEach((f) => f.setMaxVelocity(value))],
   'enemy.velocityLerp': [0.2, 0, 1],
-  'enemy.flockAcceleration': [1000, 0, 10000],
+  'enemy.flockAcceleration': [200, 0, 10000],
   'enemy.cohereRadius': [1000, 0, 1000],
   'enemy.cohereFactor': [20, 0, 100],
   'enemy.spreadRadius': [100, 0, 1000],
-  'enemy.spreadFactor': [30, 0, 100],
+  'enemy.spreadFactor': [60, 0, 100],
   'enemy.avoidPlayerRadius': [100, 0, 1000],
   'enemy.avoidPlayerFactor': [500, 0, 100],
   'enemy.seekPlayerRadius': [1000, 0, 1000],
@@ -193,8 +209,8 @@ export const propSpecs = {
   'enemy.followerFactor': [25, 0, 1000],
   'enemy.victimRadius': [300, 0, 1000],
   'enemy.victimFactor': [700, 0, 1000],
-  'enemy.victimAcceleration': [100, 0, 1000],
-  'enemy.victimVelocity': [100, 0, 1000],
+  'enemy.victimAcceleration': [1000, 0, 1000],
+  'enemy.victimVelocity': [10, 0, 1000],
 
   'effects.sceneTransition.transition': [{
     animation: 'pushLeft',
@@ -215,6 +231,8 @@ export const propSpecs = {
   'effects.zoomOnLoss.recover_pan_ease': ['Cubic.easeInOut', tweenEases],
   'effects.zoomOnLoss.recover_time_scale_duration': [100, 0, 10000],
   'effects.zoomOnLoss.recover_time_scale_ease': ['Cubic.easeInOut', tweenEases],
+
+  'effects.followerDie.duration': [100, 0, 10000],
 };
 
 propSpecs['scene.camera.lerp'][0] = 0.05;
