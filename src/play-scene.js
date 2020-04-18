@@ -82,9 +82,9 @@ export default class PlayScene extends SuperScene {
       if (spec.group) {
         let group;
         if (spec.isStatic) {
-          group = this.physics.add.staticGroup({key: spec.group});
+          group = this.physics.add.staticGroup();
         } else {
-          group = this.physics.add.group({key: spec.group});
+          group = this.physics.add.group();
         }
 
         groups[spec.group] = {
@@ -123,7 +123,7 @@ export default class PlayScene extends SuperScene {
     const {width: levelWidth, height: levelHeight} = level;
     const {tileWidth, tileHeight} = this.game.config;
 
-    const boundary = this.physics.add.staticGroup({key: 'boundary'});
+    const boundary = this.physics.add.staticGroup();
 
     const bw = tileWidth * 10;
     const bh = tileHeight * 10;
@@ -188,7 +188,7 @@ export default class PlayScene extends SuperScene {
     const halfWidth = tileWidth / 2;
     const halfHeight = tileHeight / 2;
 
-    const followerGroup = this.physics.add.group({key: 'followers'});
+    const followerGroup = this.physics.add.group();
 
     const mass = prop('follower.mass');
     const bounce = prop('follower.bounce');
@@ -224,7 +224,7 @@ export default class PlayScene extends SuperScene {
 
   createEnemies(defer) {
     const {level} = this;
-    const enemyGroup = level.enemyGroup || this.physics.add.group({key: 'enemies'});
+    const enemyGroup = level.enemyGroup || this.physics.add.group();
     const enemies = level.enemies || [];
 
     if (!defer) {
