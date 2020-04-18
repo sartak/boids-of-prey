@@ -99,12 +99,28 @@ export const propSpecs = {
 
   'player.x': [0.1, null, 'level.player.x'],
   'player.y': [0.1, null, 'level.player.y'],
+  'player.acceleration': [300, 0, 10000],
+  'player.mass': [1, 0, 100, (value, scene) => scene.level.player.setMass(value)],
+  'player.drag': [0.8, 0, 1, (value, scene) => scene.level.player.setDrag(value)],
+  'player.friction': [1, 0, 100, (value, scene) => scene.level.player.setFriction(value)],
+  'player.bounce': [1, 0, 100, (value, scene) => scene.level.player.setBounce(value)],
+  'player.maxVelocity': [200, 0, 1000, (value, scene) => scene.level.player.setMaxVelocity(value)],
+
+  'follower.mass': [1, 0, 100, (value, scene) => scene.level.followers.forEach((f) => f.setMass(value))],
+  'follower.drag': [0.95, 0, 1, (value, scene) => scene.level.followers.forEach((f) => f.setDrag(value))],
+  'follower.friction': [1, 0, 100, (value, scene) => scene.level.followers.forEach((f) => f.setFriction(value))],
+  'follower.bounce': [1, 0, 100, (value, scene) => scene.level.followers.forEach((f) => f.setBounce(value))],
+  'follower.maxVelocity': [200, 0, 1000, (value, scene) => scene.level.followers.forEach((f) => f.setMaxVelocity(value))],
 
   'effects.sceneTransition.transition': [{
     animation: 'pushLeft',
     ease: 'Cubic.easeInOut',
   }],
 };
+
+propSpecs['scene.camera.lerp'][0] = 0.05;
+propSpecs['scene.camera.deadzoneX'][0] = 200;
+propSpecs['scene.camera.deadzoneY'][0] = 200;
 
 export const tileDefinitions = {
   '.': {
@@ -117,10 +133,16 @@ export const tileDefinitions = {
     image: 'tileGrassRock',
     group: 'rock',
     isStatic: true,
+    isCircle: true,
   },
   ',': {
     image: 'tileGrass',
     group: 'transition',
+    isStatic: true, // for followers
+  },
+  '+': {
+    image: 'tileGrass',
+    // followers
   },
   /*
   '{': {

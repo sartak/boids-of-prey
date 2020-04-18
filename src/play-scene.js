@@ -1,5 +1,5 @@
 import SuperScene from './scaffolding/SuperScene';
-import prop from './props';
+import prop, {tileDefinitions} from './props';
 import analytics from './scaffolding/lib/analytics';
 
 const FAR_EDGE = 'FAR_EDGE';
@@ -56,6 +56,7 @@ export default class PlayScene extends SuperScene {
     this.createMap();
 
     this.level.player = this.createPlayer();
+    this.level.followers = this.createFollowers();
 
     this.setupPhysics();
 
@@ -67,48 +68,45 @@ export default class PlayScene extends SuperScene {
     const {tileWidth, tileHeight} = this.game.config;
     const halfHeight = tileHeight / 2;
     const halfWidth = tileWidth / 2;
+    const radius = (halfHeight + halfWidth) / 2;
 
     const groups = level.groups = {};
+    Object.values(tileDefinitions).forEach((spec) => {
+      if (spec.group) {
+        let group;
+        if (spec.isStatic) {
+          group = this.physics.add.staticGroup({key: spec.group});
+        } else {
+          group = this.physics.add.group({key: spec.group});
+        }
+
+        groups[spec.group] = {
+          tiles: [],
+          objects: [],
+          ...spec,
+          group,
+        };
+      }
+    });
 
     level.map.forEach((row, y) => {
       row.forEach((tile, x) => {
         const [xCoord, yCoord] = this.positionToScreenCoordinate(tile.x, tile.y);
 
+        let object;
         if (tile.group) {
-          if (!groups[tile.group]) {
-            groups[tile.group] = {
-              tiles: [],
-              isStatic: tile.isStatic,
-            };
+          const group = groups[tile.group];
+          object = group.group.create(xCoord + halfWidth, yCoord + halfHeight, tile.image);
+          group.objects.push(object);
+
+          if (tile.isCircle) {
+            object.setCircle(radius);
           }
-
-          groups[tile.group].tiles.push(tile);
         } else {
-          const object = this.add.image(xCoord + halfWidth, yCoord + halfHeight, tile.image);
-          tile.object = object;
-          object.tile = tile;
+          object = this.add.image(xCoord + halfWidth, yCoord + halfHeight, tile.image);
         }
-      });
-    });
-
-    Object.entries(groups).forEach(([key, config]) => {
-      const {tiles, isStatic} = config;
-
-      let group;
-      if (isStatic) {
-        group = this.physics.add.staticGroup({key});
-      } else {
-        group = this.physics.add.group({key});
-      }
-      config.group = group;
-      config.objects = [];
-
-      tiles.forEach((tile) => {
-        const [xCoord, yCoord] = this.positionToScreenCoordinate(tile.x, tile.y);
-        const object = group.create(xCoord + halfWidth, yCoord + halfHeight, tile.image);
         object.tile = tile;
         tile.object = object;
-        config.objects.push(object);
       });
     });
   }
@@ -137,10 +135,57 @@ export default class PlayScene extends SuperScene {
       y = level.height - tileHeight * 2;
     }
 
-    const player = this.physics.add.sprite(x, y, 'spriteThing');
+    const player = this.physics.add.sprite(x, y, 'spritePlayer');
+    player.setMass(prop('player.mass'));
+    player.setBounce(prop('player.bounce'));
+    player.setDrag(prop('player.drag'));
+    player.setMaxVelocity(prop('player.maxVelocity'));
+    player.setDamping(true);
+    player.setFriction(prop('player.friction'));
+    player.setCircle((halfWidth + halfHeight) / 2);
+
     this.cameraFollow(player);
 
     return player;
+  }
+
+  createFollowers() {
+    const {level} = this;
+    const {tileHeight, tileWidth} = this.game.config;
+    const halfWidth = tileWidth / 2;
+    const halfHeight = tileHeight / 2;
+
+    const followerGroup = this.physics.add.group({key: 'followers'});
+
+    const mass = prop('follower.mass');
+    const bounce = prop('follower.bounce');
+    const drag = prop('follower.drag');
+    const friction = prop('follower.friction');
+    const maxVelocity = prop('follower.maxVelocity');
+    const radius = (halfWidth + halfHeight) / 2;
+
+    const tiles = level.mapLookups['+'] || [];
+    const followers = tiles.map((tile) => {
+      const [xCoord, yCoord] = this.positionToScreenCoordinate(tile.x, tile.y);
+
+      const follower = followerGroup.create(xCoord + halfWidth, yCoord + halfHeight, 'spriteFollower');
+
+      follower.setMass(mass);
+      follower.setBounce(bounce);
+      follower.setDrag(drag);
+      follower.setDamping(true);
+      follower.setFriction(friction);
+      follower.setMaxVelocity(maxVelocity);
+      follower.setCollideWorldBounds(true);
+      follower.setCircle(radius);
+
+      return follower;
+    });
+
+    level.followers = followers;
+    level.followerGroup = followerGroup;
+
+    return followers;
   }
 
   setupAnimations() {
@@ -148,10 +193,16 @@ export default class PlayScene extends SuperScene {
 
   setupPhysics() {
     const {level, physics} = this;
-    const {player, groups} = level;
+    const {player, groups, followerGroup} = level;
 
     physics.add.overlap(player, groups.transition.group, this.enteredTransition, null, this);
     physics.add.collider(player, groups.rock.group);
+
+    physics.add.collider(followerGroup, player);
+    physics.add.collider(followerGroup, groups.rock.group);
+    physics.add.collider(followerGroup, followerGroup);
+    // not needed because world collide
+    // physics.add.collider(followerGroup, groups.transition.group);
   }
 
   enteredTransition(player, transition) {
@@ -247,21 +298,23 @@ export default class PlayScene extends SuperScene {
     const {command, level} = this;
     const {player} = level;
 
+    const accel = prop('player.acceleration');
+    let ax = 0;
+    let ay = 0;
+
     if (command.up.held) {
-      player.setVelocityY(-200);
+      ay = -accel;
     } else if (command.down.held) {
-      player.setVelocityY(200);
-    } else {
-      player.setVelocityY(0);
+      ay = accel;
     }
 
     if (command.right.held) {
-      player.setVelocityX(200);
+      ax = accel;
     } else if (command.left.held) {
-      player.setVelocityX(-200);
-    } else {
-      player.setVelocityX(0);
+      ax = -accel;
     }
+
+    player.body.setAcceleration(ax, ay);
   }
 
   fixedUpdate(time, dt) {
@@ -301,9 +354,16 @@ export default class PlayScene extends SuperScene {
 
   debugHandlePointerdown(event) {
     let {x, y} = event;
+    const {level} = this;
+    const {player} = level;
 
     x += this.camera.scrollX;
     y += this.camera.scrollY;
+
+    player.body.setAcceleration(0, 0);
+    player.body.setVelocity(0, 0);
+    player.x = x;
+    player.y = y;
   }
 
   _hotReloadCurrentLevel() {
@@ -318,5 +378,6 @@ export default class PlayScene extends SuperScene {
   }
 
   _hot() {
+    this._hotReloadCurrentLevel();
   }
 }
