@@ -2,15 +2,25 @@ import {
   builtinPropSpecs, ManageableProps, PropLoader, makePropsWithPrefix,
   preprocessPropSpecs,
 } from './scaffolding/lib/props';
+import {tweenEases} from './scaffolding/lib/tweens';
 
 const particleImages = [
   '',
 ];
 
 export const commands = {
+  attack: { // ekks
+    input: ['keyboard.Z', 'gamepad.A'],
+  },
+  shoot: { // circle
+    input: ['keyboard.X', 'gamepad.B'],
+  },
+  dash: { // square
+    input: ['keyboard.C', 'gamepad.X'],
+  },
   /*
-  action: {
-    input: ['keyboard.Z', 'keyboard.SPACE', 'gamepad.A', 'gamepad.B', 'gamepad.X', 'gamepad.Y'],
+  : { // triangle
+    input: ['keyboard.', 'gamepad.Y'],
   },
   */
   up: {
@@ -107,14 +117,26 @@ export const propSpecs = {
 
   'player.x': [0.1, null, 'level.player.x'],
   'player.y': [0.1, null, 'level.player.y'],
+  'player.velocity_x': [0.1, null, 'level.player.body.velocity.x'],
+  'player.velocity_y': [0.1, null, 'level.player.body.velocity.y'],
   'player.acceleration_x': [0.1, null, 'level.player.body.acceleration.x'],
   'player.acceleration_y': [0.1, null, 'level.player.body.acceleration.y'],
-  'player.acceleration': [1000, 0, 5000],
+  'player.acceleration': [3000, 0, 5000],
   'player.mass': [1, 0, 100, (value, scene) => scene.level.player.body.setMass(value)],
   'player.drag': [0.8, 0, 1, (value, scene) => scene.level.player.setDrag(value)],
   'player.friction': [1, 0, 100, (value, scene) => scene.level.player.setFriction(value)],
   'player.bounce': [1, 0, 100, (value, scene) => scene.level.player.setBounce(value)],
   'player.maxVelocity': [200, 0, 1000, (value, scene) => scene.level.player.setMaxVelocity(value)],
+
+  'player.dash.active': [false, null, 'level.player.dash.active'],
+  'player.dash.cooldown': [false, null, 'level.player.dash.cooldown'],
+  'player.dash.velocity': [500, 0, 1000],
+  'player.dash.in_duration': [100, 0, 1000],
+  'player.dash.sustain_duration': [200, 0, 1000],
+  'player.dash.out_duration': [100, 0, 1000],
+  'player.dash.in_ease': ['Cubic.easeIn', tweenEases],
+  'player.dash.out_ease': ['Cubic.easeOut', tweenEases],
+  'player.dash.cooldown_duration': [300, 0, 1000],
 
   'follower.mass': [1, 0, 100, (value, scene) => scene.level.followers.forEach((f) => f.body.setMass(value))],
   'follower.drag': [0.95, 0, 1, (value, scene) => scene.level.followers.forEach((f) => f.setDrag(value))],

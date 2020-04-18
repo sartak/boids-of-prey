@@ -172,6 +172,10 @@ export default class PlayScene extends SuperScene {
     player.setFriction(prop('player.friction'));
     player.setCircle((halfWidth + halfHeight) / 2);
 
+    player.dash = {
+      active: false,
+    };
+
     this.cameraFollow(player);
 
     return player;
@@ -427,6 +431,35 @@ export default class PlayScene extends SuperScene {
       player.body.setAcceleration(ax * accel, ay * accel);
     } else {
       player.body.setAcceleration(0, 0);
+    }
+
+    if (command.dash.started && !player.dash.active && !player.dash.cooldown) {
+      player.dash.active = true;
+      const normalVelocity = prop('player.maxVelocity');
+      const dashVelocity = prop('player.dash.velocity');
+
+      this.tweenSustainExclusive(
+        'dashTimer',
+        prop('player.dash.in_duration'),
+        prop('player.dash.sustain_duration'),
+        prop('player.dash.out_duration'),
+        (factor) => {
+          const v = normalVelocity + factor * (dashVelocity - normalVelocity);
+          player.setMaxVelocity(v);
+        },
+        null,
+        null,
+        () => {
+          player.dash.active = false;
+          player.dash.cooldown = true;
+
+          this.timer(() => {
+            player.dash.cooldown = false;
+          }, prop('player.dash.cooldown_duration'));
+        },
+        prop('player.dash.in_ease'),
+        prop('player.dash.out_ease'),
+      );
     }
   }
 
