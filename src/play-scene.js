@@ -442,48 +442,6 @@ export default class PlayScene extends SuperScene {
     return this.physics.overlapRect(x - r / 2, y - r / 2, r, r, false, true).map((body) => body.gameObject).filter((object) => object.tile && object.tile.isObstacle);
   }
 
-  avoidVector(objects, ox, oy, r) {
-    let x = 0;
-    let y = 0;
-    let count = 0;
-
-    objects.forEach((object) => {
-      const dx = ox - object.x;
-      const dy = oy - object.y;
-      const d = Math.sqrt(dx ** 2 + dy ** 2);
-      if (d > r) {
-        return;
-      }
-
-      x += dx / (d ** 2);
-      y += dy / (d ** 2);
-      count += 1;
-    });
-
-    if (count === 0) {
-      return null;
-    }
-
-    x /= count;
-    x /= count;
-
-    return NormalizeVector(x, y);
-  }
-
-  avoidObject(object, ox, oy, r) {
-    const dx = object.x - ox;
-    const dy = object.y - oy;
-    const d = Math.sqrt(dx ** 2 + dy ** 2);
-    if (d > r) {
-      return;
-    }
-
-    const x = dx / (d ** 2);
-    const y = dy / (d ** 2);
-
-    return NormalizeVector(x, y);
-  }
-
   flockFollowers() {
     const {level} = this;
     const {followers, player} = level;
