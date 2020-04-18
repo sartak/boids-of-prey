@@ -8,18 +8,93 @@ const particleImages = [
 ];
 
 export const commands = {
+  /*
+  action: {
+    input: ['keyboard.Z', 'keyboard.SPACE', 'gamepad.A', 'gamepad.B', 'gamepad.X', 'gamepad.Y'],
+  },
+  */
+
+  quit: {
+    input: ['keyboard.Q'],
+    execute: 'forceQuit',
+    debug: true,
+    unignorable: true,
+    unreplayable: true,
+  },
+  recordCycle: {
+    input: ['gamepad.R1'],
+    unreplayable: true,
+    debug: true,
+    unignorable: true,
+    execute: (scene, game) => {
+      const {_replay, _recording} = game;
+      if (_replay && _replay.timeSight) {
+        game.stopReplay();
+      } else if (_replay) {
+        setTimeout(() => {
+          game.stopReplay();
+          game.beginReplay({..._replay, timeSight: true});
+        });
+      } else if (_recording) {
+        game.stopRecording();
+      } else {
+        game.beginRecording();
+      }
+    },
+  },
 };
 
-export const shaderCoordFragments = null;
-export const shaderColorFragments = null;
+export const shaderCoordFragments = [
+  'shockwave',
+
+  /*
+  ['foo', {
+    bar: ['float', 0, null],
+    baz: ['vec2', [0.5, 0.5], null],
+    quux: ['float', 10.0, 0, 500],
+    blang: ['bool', true],
+  }, `
+      ux.x += 0.0 + foo_bar;
+      ux.y += 0.0 + foo_baz.x;
+  `],
+  */
+];
+
+export const shaderColorFragments = [
+  'blur',
+  'tint',
+
+  /*
+  ['blah', {
+    color: ['rgba', [1, 1, 1, 1]],
+  }, `
+      c.r *= blah_color.r * blah_color.a;
+      c.g *= blah_color.g * blah_color.a;
+      c.b *= blah_color.b * blah_color.a;
+  `],
+  */
+];
 
 export const propSpecs = {
   ...builtinPropSpecs(commands, shaderCoordFragments, shaderColorFragments),
 
+  // 'command.ignore_all.intro': [false, null, (scene) => scene.command.ignoreAll(scene, 'intro')],
+  // 'rules.base_gravity': [400, 0, 1000],
+  // 'level.name': ['', null],
 };
 
 export const tileDefinitions = {
   '.': null, // background
+  /*
+  '#': {
+    image: 'tileWall',
+    group: 'ground',
+  },
+  '{': {
+    _inherit: '#',
+    leftEdge: true,
+  },
+  */
 };
 
 preprocessPropSpecs(propSpecs, particleImages);

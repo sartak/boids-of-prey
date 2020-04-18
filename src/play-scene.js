@@ -42,6 +42,8 @@ export default class PlayScene extends SuperScene {
 
   create(config) {
     super.create(config);
+
+    this.physics.add.sprite(0, 0 /* , 'spriteName' */ );
   }
 
   setupAnimations() {
