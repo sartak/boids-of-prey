@@ -149,7 +149,13 @@ function commandProps(commands) {
   const props = {};
 
   Object.entries(commands).forEach(([name, config]) => {
-    props[`command.${name}.held`] = [false, null];
+    if (config.joystick) {
+      props[`command.${name}.x`] = [0.1, null, `command.${name}.held[0]`];
+      props[`command.${name}.y`] = [0.1, null, `command.${name}.held[1]`];
+    } else {
+      props[`command.${name}.held`] = [false, null];
+    }
+
     props[`command.${name}.started`] = [false, null];
     props[`command.${name}.continued`] = [false, null];
     props[`command.${name}.released`] = [false, null];
@@ -161,7 +167,7 @@ function commandProps(commands) {
 
     props[`command.${name}.enabled`] = [true];
 
-    if (config.execute) {
+    if (!config.joystick && config.execute) {
       const execute = typeof config.execute === 'function'
         ? (scene, game) => config.execute(scene, game)
         : (scene, game) => scene[config.execute](scene, game);
@@ -193,6 +199,8 @@ const knownInputs = [
   'gamepad.RSTICK.DOWN',
   'gamepad.RSTICK.LEFT',
   'gamepad.RSTICK.RIGHT',
+  'gamepad.LSTICK.RAW',
+  'gamepad.RSTICK.RAW',
 
   ...(Object.keys(Phaser.Input.Keyboard.KeyCodes).map((x) => `keyboard.${x}`)),
 ].reduce((a, b) => {

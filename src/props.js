@@ -25,6 +25,14 @@ export const commands = {
   right: {
     input: ['keyboard.RIGHT', 'gamepad.RIGHT'],
   },
+  lstick: {
+    input: ['gamepad.LSTICK.RAW'],
+    joystick: true,
+  },
+  rstick: {
+    input: ['gamepad.RSTICK.RAW'],
+    joystick: true,
+  },
 
   quit: {
     input: ['keyboard.Q'],
@@ -132,18 +140,18 @@ export const propSpecs = {
   'enemy.friction': [1, 0, 100, (value, scene) => scene.level.enemies.forEach((f) => f.setFriction(value))],
   'enemy.bounce': [1, 0, 100, (value, scene) => scene.level.enemies.forEach((f) => f.setBounce(value))],
   'enemy.maxVelocity': [100, 0, 1000, (value, scene) => scene.level.enemies.forEach((f) => f.setMaxVelocity(value))],
-  'enemy.flockAcceleration': [150, 0, 1000],
+  'enemy.flockAcceleration': [1000, 0, 10000],
   'enemy.cohereRadius': [1000, 0, 1000],
-  'enemy.cohereFactor': [1, 0, 100],
+  'enemy.cohereFactor': [20, 0, 100],
   'enemy.spreadRadius': [100, 0, 1000],
-  'enemy.spreadFactor': [40, 0, 100],
+  'enemy.spreadFactor': [30, 0, 100],
   'enemy.avoidPlayerRadius': [100, 0, 1000],
   'enemy.avoidPlayerFactor': [500, 0, 100],
   'enemy.seekPlayerRadius': [1000, 0, 1000],
   'enemy.seekPlayerFactor': [1, 0, 100],
-  'enemy.obstacleRadius': [50, 0, 1000],
+  'enemy.obstacleRadius': [80, 0, 1000],
   'enemy.obstacleFactor': [1000, 0, 1000],
-  'enemy.victimRadius': [200, 0, 1000],
+  'enemy.victimRadius': [300, 0, 1000],
   'enemy.victimFactor': [700, 0, 1000],
   'enemy.followerRadius': [1000, 0, 1000],
   'enemy.followerFactor': [25, 0, 1000],

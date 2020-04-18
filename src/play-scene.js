@@ -411,10 +411,17 @@ export default class PlayScene extends SuperScene {
       ax = -1;
     }
 
+    if (command.lstick.held) {
+      [ax, ay] = command.lstick.held;
+    } else if (command.rstick.held) {
+      [ax, ay] = command.rstick.held;
+    }
+
     if (ax || ay) {
       if (ax && ay) {
-        ax *= Math.SQRT1_2;
-        ay *= Math.SQRT1_2;
+        [ax, ay] = NormalizeVector(ax, ay);
+        // ax *= Math.SQRT1_2;
+        // ay *= Math.SQRT1_2;
       }
       const accel = prop('player.acceleration');
       player.body.setAcceleration(ax * accel, ay * accel);
