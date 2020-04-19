@@ -29,6 +29,7 @@ export default class PlayScene extends SuperScene {
   initialSaveState() {
     return {
       createdAt: Date.now(),
+      levelId: 'intro',
     };
   }
 
@@ -43,6 +44,11 @@ export default class PlayScene extends SuperScene {
     super.init(config);
     this.config = config;
     this.xBorder = this.yBorder = 0;
+
+    if (config.levelId === undefined) {
+      config.levelId = this.save.levelId;
+    }
+    console.log(config, this.save);
   }
 
   preload() {
@@ -52,8 +58,27 @@ export default class PlayScene extends SuperScene {
   create(config) {
     super.create(config);
 
-    this.loadLevel(config.levelId || 'intro');
+    const levelId = config.levelId || 'intro';
+    this.loadLevel(levelId);
     this.flock_amount = 0;
+
+    this.save.levelId = levelId;
+    console.log(this.save);
+    this.saveState();
+  }
+
+  getTreasure(name) {
+    this.save[name] = true;
+    this.saveState();
+  }
+
+  spawnTreasure() {
+  }
+
+  collectTreasure(player, treasure) {
+    const [x, y] = treasure;
+    treasure.destroy();
+    this.speak(x, y, this.level.treasure.script);
   }
 
   loadLevel(id) {
@@ -80,6 +105,12 @@ export default class PlayScene extends SuperScene {
           script[2] = tile.yCoord - tileHeight;
         }
       });
+    }
+
+    this.night_amount = this.old_night_amount || 0;
+    this.tweenNightAmount(level.initialNight || 0);
+    if (this.oldScene) {
+      this.oldScene.tweenNightAmount(level.initialNight || 0);
     }
 
     return level;
@@ -418,6 +449,11 @@ export default class PlayScene extends SuperScene {
     const {level} = this;
     level.enemies = level.enemies.filter((f) => f !== enemy);
     enemy.destroy();
+
+    if (level.enemies.length === 0) {
+      this.tweenNightAmount(0);
+      this.tweenFlockAmount(0);
+    }
   }
 
   enteredTransition(player, transition) {
@@ -669,9 +705,26 @@ export default class PlayScene extends SuperScene {
     this.moveChildren();
     this.playDialog();
 
-    if (!this.spawnedEnemies && this['night_amount'] > 0.99) {
-      this.createEnemies();
-      this.spawnedEnemies = true;
+    if (!this.spawningEnemies && this['night_amount'] > 0.99 && time > 1000) {
+      this.spawningEnemies = true;
+      this.timer(() => {
+        this.createEnemies();
+        this.level.enemies.forEach((enemy) => {
+          enemy.alpha = 0;
+          enemy.cooldown = true;
+          this.tween(
+            null,
+            enemy,
+            {
+              alpha: 1,
+              duration: 500,
+              onComplete: () => {
+                enemy.cooldown = false;
+              },
+            },
+          );
+        });
+      }, 1000);
     }
   }
 
@@ -695,6 +748,16 @@ export default class PlayScene extends SuperScene {
       1000,
       (factor) => {
         this.night_amount = start * (1 - factor) + factor * amount;
+      },
+    );
+  }
+
+  tweenFlockAmount(amount) {
+    const start = this.flock_amount;
+    this.tweenPercent(
+      1000,
+      (factor) => {
+        this.flock_amount = start * (1 - factor) + factor * amount;
       },
     );
   }
@@ -758,9 +821,9 @@ export default class PlayScene extends SuperScene {
             );
           } else {
             this.tweenPercent(
-              Math.abs(outTime * dy / defaults.dy),
+              Math.abs(outTime * goof / defaults.dy),
               (factor) => {
-                label.y = y - dy * factor;
+                label.y = y - goof * factor;
               },
               () => {
                 label.destroy();
@@ -1190,9 +1253,13 @@ export default class PlayScene extends SuperScene {
   willTransitionFrom(oldScene, transition) {
     super.willTransitionFrom(oldScene, transition);
 
+    this.oldScene = oldScene;
+
     if (oldScene && oldScene.transitioning) {
       this.transitioning = true;
     }
+
+    this.old_night_amount = oldScene ? (oldScene.night_amount || 0) : 0;
   }
 
   didTransitionTo(newScene, transition) {

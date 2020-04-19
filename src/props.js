@@ -264,6 +264,16 @@ export const tileDefinitions = {
     isStatic: true, // for followers
     isObstacle: true, // for followers
   },
+  ';': {
+    // turn into transition after beating the level
+    _inherit: '*',
+  },
+  $: {
+    image: 'tileTreasureClosed',
+    group: 'treasure',
+    isStatic: true,
+    isObstacle: true,
+  },
   F: {
     image: 'tileGrassRock',
   },
