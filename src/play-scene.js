@@ -48,7 +48,6 @@ export default class PlayScene extends SuperScene {
     if (config.levelId === undefined) {
       config.levelId = this.save.levelId;
     }
-    console.log(config, this.save);
   }
 
   preload() {
@@ -63,7 +62,6 @@ export default class PlayScene extends SuperScene {
     this.flock_amount = 0;
 
     this.save.levelId = levelId;
-    console.log(this.save);
     this.saveState();
   }
 
@@ -72,13 +70,33 @@ export default class PlayScene extends SuperScene {
     this.saveState();
   }
 
-  spawnTreasure() {
+  createTreasure(defer) {
+    const {level} = this;
+    const treasureGroup = level.treasureGroup || this.physics.add.staticGroup();
+    level.treasureGroup = treasureGroup;
+
+    if (defer) {
+      return;
+    }
+
+    const {tileHeight, tileWidth} = this.game.config;
+    const halfWidth = tileWidth / 2;
+    const halfHeight = tileHeight / 2;
+
+    const [tile] = level.mapLookups.$ || [];
+    if (!tile) {
+      return;
+    }
+
+    const [xCoord, yCoord] = this.positionToScreenCoordinate(tile.x, tile.y);
+
+    level.treasure = treasureGroup.create(xCoord + halfWidth, yCoord + halfHeight, 'tileTreasureClosed');
   }
 
   collectTreasure(player, treasure) {
-    const [x, y] = treasure;
+    const {x, y} = treasure;
     treasure.destroy();
-    this.speak(x, y, this.level.treasure.script);
+    this.speak(x, y, this.level.treasureScript);
   }
 
   loadLevel(id) {
@@ -86,12 +104,15 @@ export default class PlayScene extends SuperScene {
 
     const level = this.level = super.loadLevel(id);
 
+    this.level.blockades = [];
     this.createMap();
+    this.closeExits(true);
 
     this.level.player = this.createPlayer();
     this.level.followers = this.createFollowers();
     this.level.enemies = this.createEnemies(true);
     this.level.boundary = this.createBoundary();
+    this.level.treasure = this.createTreasure(true);
 
     this.setupPhysics();
 
@@ -108,12 +129,40 @@ export default class PlayScene extends SuperScene {
     }
 
     this.night_amount = this.old_night_amount || 0;
+    this.flock_amount = this.old_flock_amount || 0;
     this.tweenNightAmount(level.initialNight || 0);
+    this.tweenFlockAmount(0);
     if (this.oldScene) {
-      this.oldScene.tweenNightAmount(level.initialNight || 0);
+      this.oldScene.tweenFlockAmount(0);
     }
 
     return level;
+  }
+
+  createTileForGroup(groupName, x, y) {
+    const {level} = this;
+    const group = level.groups[groupName];
+
+    if (group.above) {
+      this.add.image(x, y, group.above);
+    }
+
+    const object = group.group.create(x, y, group.image);
+    group.objects.push(object);
+
+    if (group.isStatic) {
+      object.setImmovable();
+    }
+
+    if (group.isCircle) {
+      const {tileWidth, tileHeight} = this.game.config;
+      const halfHeight = tileHeight / 2;
+      const halfWidth = tileWidth / 2;
+      const radius = (halfHeight + halfWidth) / 2;
+      object.setCircle(radius);
+    }
+
+    return object;
   }
 
   createMap() {
@@ -121,7 +170,6 @@ export default class PlayScene extends SuperScene {
     const {tileWidth, tileHeight} = this.game.config;
     const halfHeight = tileHeight / 2;
     const halfWidth = tileWidth / 2;
-    const radius = (halfHeight + halfWidth) / 2;
 
     const groups = level.groups = {};
     Object.values(tileDefinitions).forEach((spec) => {
@@ -150,22 +198,7 @@ export default class PlayScene extends SuperScene {
 
         let object;
         if (tile.group) {
-          const group = groups[tile.group];
-
-          if (group.above) {
-            this.add.image(xCoord + halfWidth, yCoord + halfHeight, tile.above);
-          }
-
-          object = group.group.create(xCoord + halfWidth, yCoord + halfHeight, tile.image);
-          group.objects.push(object);
-
-          if (tile.isStatic) {
-            object.setImmovable();
-          }
-
-          if (tile.isCircle) {
-            object.setCircle(radius);
-          }
+          object = this.createTileForGroup(tile.group, xCoord + halfWidth, yCoord + halfHeight);
         } else {
           object = this.add.image(xCoord + halfWidth, yCoord + halfHeight, tile.image);
         }
@@ -342,6 +375,7 @@ export default class PlayScene extends SuperScene {
     const {level, physics} = this;
     const {
       player, groups, followerGroup, enemyGroup, boundary,
+      treasureGroup,
     } = level;
 
     physics.add.overlap(player, groups.transition.group, this.enteredTransition, null, this);
@@ -349,11 +383,13 @@ export default class PlayScene extends SuperScene {
     physics.add.collider(player, groups.coop.group, this.playerCollideCoop, null, this);
     physics.add.collider(player, followerGroup, this.playerCollideFollower, null, this);
     physics.add.overlap(player, enemyGroup, this.playerKillEnemy, null, this);
+    physics.add.collider(player, treasureGroup, this.collectTreasure, null, this);
 
     physics.add.collider(followerGroup, groups.rock.group, this.justCoolItDown, null, this);
     physics.add.collider(followerGroup, groups.coop.group, this.justCoolItDown, null, this);
     physics.add.collider(followerGroup, followerGroup, this.justCoolItDown, null, this);
     physics.add.collider(followerGroup, boundary, this.justCoolItDown, null, this);
+    physics.add.collider(followerGroup, treasureGroup, this.justCoolItDown, null, this);
     // not needed because world collide
     // physics.add.collider(followerGroup, groups.transition.group);
 
@@ -361,6 +397,7 @@ export default class PlayScene extends SuperScene {
     physics.add.collider(enemyGroup, groups.coop.group, this.enemyCollideCoop, null, this);
     physics.add.collider(enemyGroup, enemyGroup, this.justCoolItDown, null, this);
     physics.add.collider(enemyGroup, boundary, this.justCoolItDown, null, this);
+    physics.add.collider(enemyGroup, treasureGroup, this.justCoolItDown, null, this);
     physics.add.overlap(enemyGroup, followerGroup, this.enemyKillFollower, null, this);
   }
 
@@ -451,9 +488,65 @@ export default class PlayScene extends SuperScene {
     enemy.destroy();
 
     if (level.enemies.length === 0) {
-      this.tweenNightAmount(0);
-      this.tweenFlockAmount(0);
+      this.winLevel();
     }
+  }
+
+  closeExits(forward, extraDelay = 0) {
+    const {level} = this;
+    const {tileHeight, tileWidth} = this.game.config;
+    const halfWidth = tileWidth / 2;
+    const halfHeight = tileHeight / 2;
+
+    const glyph = forward ? ';' : '^';
+
+    const tiles = [...level.mapLookups[glyph] || []];
+    tiles.sort((a, b) => a.x - b.x || a.y - b.y);
+
+    this.level.blockades.push(tiles);
+
+    const time = forward ? 0 : 500;
+
+    if (time) {
+      this.command.ignoreAll('blockade', true);
+    }
+
+    tiles.forEach((tile, i) => {
+      this.timer(() => {
+        const {xCoord, yCoord} = tile;
+        tile.object.disableBody();
+        const object = this.createTileForGroup('rock', xCoord + halfWidth, yCoord + halfHeight);
+        tile.block = object;
+      }, time * (i + 2));
+    });
+
+    this.timer(() => {
+      this.command.ignoreAll('blockade', false);
+    }, time * (tiles.length + 2) + extraDelay);
+
+    return time * (tiles.length + 2);
+  }
+
+  openExits() {
+    const {level} = this;
+    const {tileHeight, tileWidth} = this.game.config;
+    const halfWidth = tileWidth / 2;
+    const halfHeight = tileHeight / 2;
+
+    level.blockades.forEach((tiles) => {
+      tiles.forEach((tile, i) => {
+        this.timer(() => {
+          tile.object.enableBody();
+          tile.block.destroy();
+        }, 1000 + 500 * i);
+      });
+    });
+  }
+
+  winLevel() {
+    this.tweenNightAmount(0);
+    this.tweenFlockAmount(0);
+    this.openExits();
   }
 
   enteredTransition(player, transition) {
@@ -549,6 +642,12 @@ export default class PlayScene extends SuperScene {
     const {level} = this;
     const {player} = level;
     const {tileWidth, tileHeight} = this.game.config;
+
+    if (level.onDash) {
+      const script = level.onDash;
+      delete level.onDash;
+      this.speak(player.x, player.y, script);
+    }
 
     player.dash.active = true;
     player.dash.ax = ax;
@@ -707,6 +806,9 @@ export default class PlayScene extends SuperScene {
 
     if (!this.spawningEnemies && this['night_amount'] > 0.99 && time > 1000) {
       this.spawningEnemies = true;
+
+      const duration = this.closeExits(false, 500);
+
       this.timer(() => {
         this.createEnemies();
         this.level.enemies.forEach((enemy) => {
@@ -724,7 +826,7 @@ export default class PlayScene extends SuperScene {
             },
           );
         });
-      }, 1000);
+      }, duration);
     }
   }
 
@@ -1260,6 +1362,7 @@ export default class PlayScene extends SuperScene {
     }
 
     this.old_night_amount = oldScene ? (oldScene.night_amount || 0) : 0;
+    this.old_flock_amount = oldScene ? (oldScene.flock_amount || 0) : 0;
   }
 
   didTransitionTo(newScene, transition) {

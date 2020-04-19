@@ -7,6 +7,8 @@ import spritePlayer from './sprite/player.png';
 import tileCoop from './tile/coop.png';
 import tileGrass from './tile/grass.png';
 import tileGrassRock from './tile/grassrock.png';
+import tileTreasureClosed from './tile/treasure-closed.png';
+import tileTreasureOpen from './tile/treasure-open.png';
 
 export const imageAssets = {
   imageCloud,
@@ -19,6 +21,8 @@ export const spriteAssets = {
   spriteFollower,
   spritePlayer,
   tileCoop,
+  tileTreasureClosed,
+  tileTreasureOpen,
 };
 
 export const musicAssets = {

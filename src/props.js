@@ -9,13 +9,13 @@ const particleImages = [
 ];
 
 export const commands = {
-  attack: { // ekks
+  dash: { // ekks
     input: ['keyboard.Z', 'gamepad.A'],
   },
   shoot: { // circle
     input: ['keyboard.X', 'gamepad.B'],
   },
-  dash: { // square
+  attack: { // square
     input: ['keyboard.C', 'gamepad.X'],
   },
   /*
@@ -265,14 +265,13 @@ export const tileDefinitions = {
     isObstacle: true, // for followers
   },
   ';': {
-    // turn into transition after beating the level
-    _inherit: '*',
+    _inherit: ',',
+  },
+  '^': {
+    _inherit: ',',
   },
   $: {
-    image: 'tileTreasureClosed',
-    group: 'treasure',
-    isStatic: true,
-    isObstacle: true,
+    image: 'tileGrass',
   },
   F: {
     image: 'tileGrassRock',
