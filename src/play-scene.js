@@ -105,6 +105,9 @@ export default class PlayScene extends SuperScene {
     const level = this.level = super.loadLevel(id);
 
     this.level.blockades = [];
+
+    this.createUnderground(level.underground || 'imageBackground');
+
     this.createMap();
     this.closeExits(true);
 
@@ -141,21 +144,24 @@ export default class PlayScene extends SuperScene {
 
   createTileForGroup(groupName, x, y) {
     const {level} = this;
+    const {tileWidth, tileHeight} = this.game.config;
     const group = level.groups[groupName];
 
     if (group.above) {
       this.add.image(x, y, group.above);
     }
 
-    const object = group.group.create(x, y, group.image);
+    let object;
+
+    if (group.image) {
+      object = group.group.create(x, y, group.image);
+    } else {
+      object = this.add.rectangle(x, y, tileWidth, tileHeight);
+      group.group.add(object);
+    }
     group.objects.push(object);
 
-    if (group.isStatic) {
-      object.setImmovable();
-    }
-
     if (group.isCircle) {
-      const {tileWidth, tileHeight} = this.game.config;
       const halfHeight = tileHeight / 2;
       const halfWidth = tileWidth / 2;
       const radius = (halfHeight + halfWidth) / 2;
@@ -163,6 +169,34 @@ export default class PlayScene extends SuperScene {
     }
 
     return object;
+  }
+
+  cameraColor() {
+    return 0x4D8C3A;
+  }
+
+  createUnderground(name) {
+    const {level} = this;
+    const {tileWidth, tileHeight} = this.game.config;
+    const template = this.add.image(0, 0, name);
+    const {width, height} = template;
+    template.setPosition(width * -0.5, height * -0.5);
+
+    let x = -0.5;
+    let y = -0.5;
+
+    while ((x - 1) * width < level.width + tileWidth) {
+      y = -0.5;
+
+      while ((y - 1) * height < level.height + tileHeight) {
+        if (!(x === -0.5 && y === -0.5)) {
+          this.add.image(x * width, y * height, name);
+        }
+        y += 1;
+      }
+
+      x += 1;
+    }
   }
 
   createMap() {
@@ -173,6 +207,10 @@ export default class PlayScene extends SuperScene {
 
     const groups = level.groups = {};
     Object.values(tileDefinitions).forEach((spec) => {
+      if (!spec) {
+        return;
+      }
+
       if (spec.group) {
         let group;
         if (spec.isStatic) {
@@ -199,11 +237,13 @@ export default class PlayScene extends SuperScene {
         let object;
         if (tile.group) {
           object = this.createTileForGroup(tile.group, xCoord + halfWidth, yCoord + halfHeight);
-        } else {
+        } else if (tile.image) {
           object = this.add.image(xCoord + halfWidth, yCoord + halfHeight, tile.image);
         }
-        object.tile = tile;
-        tile.object = object;
+        if (object) {
+          object.tile = tile;
+          tile.object = object;
+        }
       });
     });
   }
@@ -336,7 +376,7 @@ export default class PlayScene extends SuperScene {
       const radius = (halfWidth + halfHeight) / 2;
 
       Object.entries(tileDefinitions).forEach(([glyph, spec]) => {
-        if (!spec.enemy) {
+        if (!spec || !spec.enemy) {
           return;
         }
         const tiles = level.mapLookups[glyph] || [];

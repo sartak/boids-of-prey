@@ -245,12 +245,12 @@ propSpecs['scene.camera.deadzoneX'][0] = 200;
 propSpecs['scene.camera.deadzoneY'][0] = 200;
 
 export const tileDefinitions = {
-  '.': {
-    image: 'tileGrass',
-  },
-  '@': {
-    image: 'tileGrass',
-  },
+  '.': null,
+  '@': null,
+  '+': null,
+  $: null,
+  F: null,
+
   '*': {
     image: 'tileGrassRock',
     group: 'rock',
@@ -259,7 +259,7 @@ export const tileDefinitions = {
     isObstacle: true,
   },
   ',': {
-    image: 'tileGrass',
+    image: null,
     group: 'transition',
     isStatic: true, // for followers
     isObstacle: true, // for followers
@@ -270,19 +270,8 @@ export const tileDefinitions = {
   '^': {
     _inherit: ',',
   },
-  $: {
-    image: 'tileGrass',
-  },
-  F: {
-    image: 'tileGrassRock',
-  },
-  '+': {
-    image: 'tileGrass',
-    // followers
-  },
   '[': {
     image: 'tileCoop',
-    above: 'tileGrass',
     group: 'coop',
     isStatic: true,
     isObstacle: true,
@@ -293,7 +282,6 @@ export const tileDefinitions = {
     _inherit: '[',
   },
   A: {
-    image: 'tileGrass',
     enemy: 'spriteEnemyA',
   },
 };
