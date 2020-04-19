@@ -12,11 +12,8 @@ export const commands = {
   dash: { // ekks
     input: ['keyboard.Z', 'gamepad.A'],
   },
-  shoot: { // circle
+  stun: { // circle
     input: ['keyboard.X', 'gamepad.B'],
-  },
-  attack: { // square
-    input: ['keyboard.C', 'gamepad.X'],
   },
   /*
   : { // triangle
@@ -81,22 +78,9 @@ export const commands = {
   },
 };
 
-export const shaderCoordFragments = null;
-/*
-[
+export const shaderCoordFragments = [
   'shockwave',
-
-  // ['foo', {
-  //   bar: ['float', 0, null],
-  //   baz: ['vec2', [0.5, 0.5], null],
-  //   quux: ['float', 10.0, 0, 500],
-  //   blang: ['bool', true],
-  // }, `
-  //     ux.x += 0.0 + foo_bar;
-  //     ux.y += 0.0 + foo_baz.x;
-  // `],
 ];
-*/
 
 export const shaderColorFragments = [
   'blur',
@@ -136,7 +120,7 @@ export const shaderColorFragments = [
 export const propSpecs = {
   ...builtinPropSpecs(commands, shaderCoordFragments, shaderColorFragments),
 
-  // 'command.ignore_all.intro': [false, null, (scene) => scene.command.ignoreAll(scene, 'intro')],
+  'command.ignore_all.blockade': [false, null, (scene) => scene.command.ignoreAll('blockade')],
   // 'rules.base_gravity': [400, 0, 1000],
 
   'level.id': ['', null],
@@ -165,6 +149,9 @@ export const propSpecs = {
   'player.dash.in_ease': ['Cubic.easeIn', tweenEases],
   'player.dash.out_ease': ['Cubic.easeOut', tweenEases],
   'player.dash.cooldown_duration': [300, 0, 1000],
+
+  'player.stun.active': [false, null, 'level.player.stun.active'],
+  'player.stun.cooldown': [false, null, 'level.player.stun.cooldown'],
 
   'follower.mass': [1, 0, 100, (value, scene) => scene.level.followers.forEach((f) => f.body.setMass(value))],
   'follower.drag': [0.95, 0, 1, (value, scene) => scene.level.followers.forEach((f) => f.setDrag(value))],
@@ -239,6 +226,14 @@ export const propSpecs = {
     lifespan: 500,
   }],
 
+  'effects.glow.particles': [{
+    scaleX: 0.1,
+    scaleY: 0.1,
+    speedY: -10,
+    lifespan: 5000,
+    frequency: 100,
+  }],
+
   'effects.loseTransition.transition': [{
     animation: 'fadeInOut',
     oldPause: 'everything',
@@ -263,17 +258,14 @@ export const tileDefinitions = {
     isCircle: true,
     isObstacle: true,
   },
-  ',': {
+  ';': {
     image: null,
     group: 'transition',
     isStatic: true, // for followers
     isObstacle: true, // for followers
   },
-  ';': {
-    _inherit: ',',
-  },
   '^': {
-    _inherit: ',',
+    _inherit: ';',
   },
   '[': {
     image: 'tileCoop',

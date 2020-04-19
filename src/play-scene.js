@@ -8,6 +8,10 @@ import {
 } from './vector';
 
 const FAR_EDGE = 'FAR_EDGE';
+const tileHeight = 24;
+const tileWidth = 24;
+const halfWidth = tileWidth / 2;
+const halfHeight = tileHeight / 2;
 
 export default class PlayScene extends SuperScene {
   constructor() {
@@ -30,6 +34,8 @@ export default class PlayScene extends SuperScene {
     return {
       createdAt: Date.now(),
       levelId: 'intro',
+      wonLevel: {
+      },
     };
   }
 
@@ -47,6 +53,9 @@ export default class PlayScene extends SuperScene {
 
     if (config.levelId === undefined) {
       config.levelId = this.save.levelId;
+      if (this.save.levelPlayer) {
+        config.player = this.save.levelPlayer;
+      }
     }
   }
 
@@ -62,6 +71,7 @@ export default class PlayScene extends SuperScene {
     this.flock_amount = 0;
 
     this.save.levelId = levelId;
+    this.save.levelPlayer = config.player;
     this.saveState();
   }
 
@@ -79,10 +89,6 @@ export default class PlayScene extends SuperScene {
       return;
     }
 
-    const {tileHeight, tileWidth} = this.game.config;
-    const halfWidth = tileWidth / 2;
-    const halfHeight = tileHeight / 2;
-
     const [tile] = level.mapLookups.$ || [];
     if (!tile) {
       return;
@@ -95,21 +101,28 @@ export default class PlayScene extends SuperScene {
 
   collectTreasure(player, treasure) {
     const {x, y} = treasure;
-    treasure.destroy();
-    this.speak(x, y, this.level.treasureScript);
+    if (treasure.collected) {
+      return;
+    }
+
+    treasure.collected = true;
+    treasure.setTexture('tileTreasureOpen');
+    this.speak(x - tileWidth, y + tileHeight, this.level.treasureScript);
   }
 
   loadLevel(id) {
-    const {tileWidth, tileHeight} = this.game.config;
-
     const level = this.level = super.loadLevel(id);
+    level.levelId = id;
 
     this.level.blockades = [];
 
     this.createUnderground(level.underground || 'imageBackground');
 
     this.createMap();
-    this.closeExits(true);
+
+    if (!this.save.wonLevel[id]) {
+      this.closeExits(false, true);
+    }
 
     this.level.player = this.createPlayer();
     this.level.followers = this.createFollowers();
@@ -136,6 +149,7 @@ export default class PlayScene extends SuperScene {
     this.tweenNightAmount(level.initialNight || 0);
     this.tweenFlockAmount(0);
     if (this.oldScene) {
+      this.oldScene.tweenNightAmount(level.initialNight || 0);
       this.oldScene.tweenFlockAmount(0);
     }
 
@@ -144,7 +158,6 @@ export default class PlayScene extends SuperScene {
 
   createTileForGroup(groupName, x, y) {
     const {level} = this;
-    const {tileWidth, tileHeight} = this.game.config;
     const group = level.groups[groupName];
 
     if (group.above) {
@@ -162,8 +175,6 @@ export default class PlayScene extends SuperScene {
     group.objects.push(object);
 
     if (group.isCircle) {
-      const halfHeight = tileHeight / 2;
-      const halfWidth = tileWidth / 2;
       const radius = (halfHeight + halfWidth) / 2;
       object.setCircle(radius);
     }
@@ -177,7 +188,6 @@ export default class PlayScene extends SuperScene {
 
   createUnderground(name) {
     const {level} = this;
-    const {tileWidth, tileHeight} = this.game.config;
     const template = this.add.image(0, 0, name);
     const {width, height} = template;
     template.setPosition(width * -0.5, height * -0.5);
@@ -201,9 +211,6 @@ export default class PlayScene extends SuperScene {
 
   createMap() {
     const {level} = this;
-    const {tileWidth, tileHeight} = this.game.config;
-    const halfHeight = tileHeight / 2;
-    const halfWidth = tileWidth / 2;
 
     const groups = level.groups = {};
     Object.values(tileDefinitions).forEach((spec) => {
@@ -251,7 +258,6 @@ export default class PlayScene extends SuperScene {
   createBoundary() {
     const {level} = this;
     const {width: levelWidth, height: levelHeight} = level;
-    const {tileWidth, tileHeight} = this.game.config;
 
     const boundary = this.physics.add.staticGroup();
 
@@ -272,9 +278,6 @@ export default class PlayScene extends SuperScene {
 
   createPlayer() {
     const {level} = this;
-    const {tileHeight, tileWidth} = this.game.config;
-    const halfWidth = tileWidth / 2;
-    const halfHeight = tileHeight / 2;
 
     let x;
     let y;
@@ -294,6 +297,11 @@ export default class PlayScene extends SuperScene {
       y = level.height - tileHeight * 2;
     }
 
+    if (this.config.player && this.config.player.transitionOffset) {
+      x += (this.config.player.transitionOffset.x || 0) * tileWidth;
+      y += (this.config.player.transitionOffset.y || 0) * tileHeight;
+    }
+
     const player = this.physics.add.sprite(x, y, 'spritePlayer');
     player.body.setMass(prop('player.mass'));
     player.setBounce(prop('player.bounce'));
@@ -305,8 +313,14 @@ export default class PlayScene extends SuperScene {
 
     player.dash = {
       active: false,
+      cooldown: false,
       ax: 0,
       ay: 0,
+    };
+
+    player.stun = {
+      active: false,
+      cooldown: false,
     };
 
     player.children = [];
@@ -318,9 +332,6 @@ export default class PlayScene extends SuperScene {
 
   createFollowers() {
     const {level} = this;
-    const {tileHeight, tileWidth} = this.game.config;
-    const halfWidth = tileWidth / 2;
-    const halfHeight = tileHeight / 2;
 
     const followerGroup = this.physics.add.group();
 
@@ -363,11 +374,6 @@ export default class PlayScene extends SuperScene {
     const enemies = level.enemies || [];
 
     if (!defer) {
-      const {tileHeight, tileWidth} = this.game.config;
-      const halfWidth = tileWidth / 2;
-      const halfHeight = tileHeight / 2;
-
-
       const mass = prop('enemy.mass');
       const bounce = prop('enemy.bounce');
       const drag = prop('enemy.drag');
@@ -477,8 +483,110 @@ export default class PlayScene extends SuperScene {
     this.justCoolItDown(player, follower);
 
     if (player.dash.active) {
+      this.stopDash();
+      this.buttobasu(player, follower);
       this.killFollower(follower);
     }
+  }
+
+  sleep(duration) {
+    this.pauseEverythingForTransition();
+    this.timer(() => {
+      this.unpauseEverythingForTransition();
+    }, duration).ignoresScenePause = true;
+  }
+
+  impact(duration, scale = 0.1) {
+    this.timeScale = scale;
+
+    this.camera.zoomTo(
+      1.05,
+      duration / 2,
+      'Cubic.easeIn',
+      true,
+    );
+
+    this.timer(() => {
+      this.timeScale = 1;
+      this.camera.zoomTo(
+        1,
+        duration,
+        'Cubic.easeIn',
+        true,
+      );
+    }, duration);
+  }
+
+  impactUnlessLosing(...args) {
+    if (this.level.zoomForLossCompleted || this.level.zoomedForLoss || this.level.unzoomForLoss) {
+      return;
+    }
+
+    this.impact(...args);
+  }
+
+  buttobasu(player, entity) {
+    entity.disableBody();
+
+    const [ex, ey] = NormalizeVector(entity.x - player.x, entity.y - player.y);
+    const [ax, ay] = NormalizeVector(player.dash.ax, player.dash.ay);
+    let dx = (ax + ex) / 2;
+    let dy = (ay + ey) / 2;
+    if (isNaN(dx) || isNaN(dy)) {
+      dx = ex;
+      dy = ey;
+    }
+
+    const pause = 40;
+    this.sleep(pause * this.timeScale);
+    this.timer(() => {
+      this.impactUnlessLosing(400, 0.2);
+    }, pause).ignoresScenePause = true;
+
+    this.camera.shake(100, 0.005);
+
+    // this.timer(() => {
+
+    this.tween(
+      null,
+      entity,
+      {
+        alpha: 0,
+        delay: 40,
+        duration: 500,
+        dx: 300 * dx,
+        dy: 300 * dy,
+        scaleX: 3,
+        scaleY: 3,
+        rotation: dx < 0 ? -300 : 300,
+        ease: 'Quad.easeOut',
+        onComplete: () => {
+          entity.destroy();
+        },
+      },
+    );
+    // });
+  }
+
+  butsu(killer, victim) {
+    victim.disableBody();
+
+    const [ex, ey] = NormalizeVector(victim.x - killer.x, victim.y - killer.y);
+
+    this.tween(
+      null,
+      victim,
+      {
+        alpha: 0,
+        duration: 500,
+        dx: 100 * ex,
+        dy: 100 * ey,
+        ease: 'Quad.easeOut',
+        onComplete: () => {
+          victim.destroy();
+        },
+      },
+    );
   }
 
   justCoolItDown(a, b) {
@@ -505,8 +613,6 @@ export default class PlayScene extends SuperScene {
       level.lastFollower = follower;
     }
 
-    follower.destroy();
-
     const reduction = 1 / level.followerCount;
     let prevFactor = 0;
     this.tweenPercent(
@@ -519,24 +625,30 @@ export default class PlayScene extends SuperScene {
   }
 
   enemyKillFollower(enemy, follower) {
+    this.butsu(enemy, follower);
     this.killFollower(follower);
   }
 
   playerKillEnemy(player, enemy) {
     const {level} = this;
     level.enemies = level.enemies.filter((f) => f !== enemy);
-    enemy.destroy();
+
+    if (player.dash.active) {
+      this.stopDash();
+      this.buttobasu(player, enemy);
+    } else {
+      this.butsu(player, enemy);
+    }
 
     if (level.enemies.length === 0) {
-      this.winLevel();
+      this.timer(() => {
+        this.winLevel();
+      }, 1000);
     }
   }
 
-  closeExits(forward, extraDelay = 0) {
+  closeExits(animated, forward, extraDelay = 0) {
     const {level} = this;
-    const {tileHeight, tileWidth} = this.game.config;
-    const halfWidth = tileWidth / 2;
-    const halfHeight = tileHeight / 2;
 
     const glyph = forward ? ';' : '^';
 
@@ -545,7 +657,7 @@ export default class PlayScene extends SuperScene {
 
     this.level.blockades.push(tiles);
 
-    const time = forward ? 0 : 500;
+    const time = animated ? 500 : 0;
 
     if (time) {
       this.command.ignoreAll('blockade', true);
@@ -554,43 +666,74 @@ export default class PlayScene extends SuperScene {
     tiles.forEach((tile, i) => {
       this.timer(() => {
         const {xCoord, yCoord} = tile;
-        tile.object.disableBody();
+        if (tile.object.disableBody) {
+          tile.object.disableBody();
+        } else {
+          tile.object.body.enable = false;
+        }
         const object = this.createTileForGroup('rock', xCoord + halfWidth, yCoord + halfHeight);
         tile.block = object;
+
+        if (animated) {
+          this.camera.shake(50, 0.01);
+        }
       }, time * (i + 2));
     });
 
-    this.timer(() => {
-      this.command.ignoreAll('blockade', false);
-    }, time * (tiles.length + 2) + extraDelay);
+    if (time) {
+      this.timer(() => {
+        this.command.ignoreAll('blockade', false);
+      }, time * (tiles.length + 2) + extraDelay);
+    }
 
     return time * (tiles.length + 2);
   }
 
   openExits() {
     const {level} = this;
-    const {tileHeight, tileWidth} = this.game.config;
-    const halfWidth = tileWidth / 2;
-    const halfHeight = tileHeight / 2;
 
     level.blockades.forEach((tiles) => {
       tiles.forEach((tile, i) => {
         this.timer(() => {
-          tile.object.enableBody();
+          if (tile.object.enableBody) {
+            tile.object.enableBody();
+          } else {
+            tile.object.body.enable = true;
+          }
           tile.block.destroy();
+          this.camera.shake(50, 0.01);
         }, 1000 + 500 * i);
       });
     });
   }
 
   winLevel() {
+    if (this.level.glowEmitter) {
+      this.level.glowEmitter.stop();
+    }
     this.tweenNightAmount(0);
     this.tweenFlockAmount(0);
     this.openExits();
+    this.save.wonLevel[this.level.levelId] = true;
+    this.saveState();
   }
 
   replaceLostLevel() {
-    this.replaceWithSelf(true, null, 'effects.loseTransition');
+    if (this.replacing) {
+      return;
+    }
+
+    this.replacing = true;
+    this.timeScale = 1;
+
+    this.replaceWithSelf(true, null, {
+      name: 'effects.loseTransition',
+      onUpdate: (factor, oldScene, newScene) => {
+        if (factor <= 0.5) {
+          oldScene.flock_amount = 1 - (factor * 2);
+        }
+      },
+    });
   }
 
   enteredTransition(player, transition) {
@@ -598,7 +741,6 @@ export default class PlayScene extends SuperScene {
       return;
     }
 
-    const {tileWidth, tileHeight} = this.game.config;
     const {x, y} = transition.tile;
     let direction = 'right';
     let animation = 'pushRight';
@@ -636,6 +778,8 @@ export default class PlayScene extends SuperScene {
       dx = 0;
     }
 
+    playerConfig.transitionOffset = this.level[`${direction}Offset`];
+
     this.transitioning = {
       direction,
     };
@@ -649,6 +793,9 @@ export default class PlayScene extends SuperScene {
     let oldY;
     let newX;
     let newY;
+
+    player.disableBody();
+    this.timeScale = 1;
 
     this.replaceWithSelf(
       true,
@@ -682,10 +829,28 @@ export default class PlayScene extends SuperScene {
     super.firstUpdate(time, dt);
   }
 
+  stopDash() {
+    const {level} = this;
+    const {player} = level;
+
+    const normalVelocity = prop('player.maxVelocity');
+    player.setMaxVelocity(normalVelocity);
+    player.dash.active = false;
+    if (player.dashEmitter) {
+      player.dashEmitter.stop();
+      player.dashEmitter = false;
+    }
+
+    player.dash.cooldown = true;
+
+    this.timer(() => {
+      player.dash.cooldown = false;
+    }, prop('player.dash.cooldown_duration'));
+  }
+
   dash(ax, ay) {
     const {level} = this;
     const {player} = level;
-    const {tileWidth, tileHeight} = this.game.config;
 
     if (level.onDash) {
       const script = level.onDash;
@@ -722,6 +887,8 @@ export default class PlayScene extends SuperScene {
       },
     );
 
+    player.dashEmitter = dashEmitter;
+
     this.tweenSustainExclusive(
       'dashTimer',
       prop('player.dash.in_duration'),
@@ -739,16 +906,90 @@ export default class PlayScene extends SuperScene {
         player.children = player.children.filter((c) => c !== dashCallback);
       },
       () => {
-        player.dash.active = false;
-        player.dash.cooldown = true;
-
-        this.timer(() => {
-          player.dash.cooldown = false;
-        }, prop('player.dash.cooldown_duration'));
+        this.stopDash();
       },
       prop('player.dash.in_ease'),
       prop('player.dash.out_ease'),
     );
+  }
+
+  stun(ax, ay) {
+    const {level} = this;
+    const {player} = level;
+
+    if (level.onStun) {
+      const script = level.onStun;
+      delete level.onStun;
+      this.speak(player.x, player.y, script);
+    }
+
+    player.stun.active = true;
+
+    const px = player.x;
+    const py = player.y;
+    this.shockwave(px, py);
+
+    [...this.level.enemies, ...this.level.followers].forEach((entity) => {
+      const distance = Distance(entity.x - px, entity.y - py);
+      const effect = 1 - distance / 300;
+      if (effect < 0) {
+        return;
+      }
+
+      if (entity.stunAlpha) {
+        entity.stunAlpha.stop();
+      }
+      if (entity.stunRotate) {
+        entity.stunRotate.stop();
+      }
+      if (entity.stunRecover) {
+        entity.stunRecover.stop();
+      }
+
+      const delay = distance * 0.75;
+
+      this.timer(() => {
+        entity.cooldown = true;
+        entity.body.setAcceleration(0, 0);
+
+        entity.stunAlpha = this.tween(
+          null,
+          entity,
+          {
+            alpha: 0.5,
+            duration: 200,
+          },
+        );
+
+        entity.stunRotate = this.tween(
+          null,
+          entity,
+          {
+            delay: 200,
+            rotation: 360,
+            duration: 2000 * effect,
+            onComplete: () => {
+              entity.stunRecover = this.tween(
+                null, entity,
+                {
+                  alpha: 1,
+                  duration: 200,
+                },
+              );
+              entity.cooldown = false;
+            },
+          },
+        );
+      }, delay);
+    });
+
+    this.timer(() => {
+      player.stun.active = false;
+      player.stun.cooldown = true;
+      this.timer(() => {
+        player.stun.cooldown = false;
+      }, 5000);
+    }, 1000);
   }
 
   processInput(time, dt) {
@@ -804,13 +1045,17 @@ export default class PlayScene extends SuperScene {
       player.body.setAcceleration(0, 0);
     }
 
-    if (command.dash.started && !player.dash.active && !player.dash.cooldown) {
+    if (command.dash.started && this.save.dash && !player.dash.active && !player.dash.cooldown) {
       // TODO facing direction
       if (!ax && !ay) {
         ax = 1;
         ay = 0;
       }
       this.dash(ax, ay);
+    }
+
+    if (command.stun.started && this.save.stun && !player.stun.active && !player.stun.cooldown) {
+      this.stun();
     }
   }
 
@@ -851,7 +1096,27 @@ export default class PlayScene extends SuperScene {
     if (!this.spawningEnemies && this['night_amount'] > 0.99 && time > 1000) {
       this.spawningEnemies = true;
 
-      const duration = this.closeExits(false, 500);
+      this.particleSystem(
+        'effects.glow',
+        {
+          x: {min: 0, max: this.level.width},
+          y: {min: 0, max: this.level.height},
+          alpha: {
+            start: 0,
+            end: 1,
+
+            ease: (t) => (t > 0.5 ? 2 * (1 - t) : t * 2),
+          },
+          onAdd: (particles, emitter) => {
+            this.level.glowEmitter = emitter;
+          },
+        },
+      );
+
+      let duration = this.closeExits(true, false, 500);
+      if (this.save.wonLevel[this.level.levelId]) {
+        duration = Math.max(this.closeExits(true, true, 500));
+      }
 
       this.timer(() => {
         this.createEnemies();
@@ -890,7 +1155,7 @@ export default class PlayScene extends SuperScene {
 
   tweenNightAmount(amount) {
     const start = this.night_amount;
-    this.tweenPercent(
+    return this.tweenPercent(
       1000,
       (factor) => {
         this.night_amount = start * (1 - factor) + factor * amount;
@@ -900,7 +1165,7 @@ export default class PlayScene extends SuperScene {
 
   tweenFlockAmount(amount) {
     const start = this.flock_amount;
-    this.tweenPercent(
+    return this.tweenPercent(
       1000,
       (factor) => {
         this.flock_amount = start * (1 - factor) + factor * amount;
@@ -935,6 +1200,7 @@ export default class PlayScene extends SuperScene {
           {
             fontFamily: '"Avenir Next", "Avenir", "Helvetica Neue", "Helvetica", "Arial"',
             fontSize: '24px',
+            fontWeight: 'bold',
             color: 'rgb(0, 0, 0)',
           },
         );
@@ -985,7 +1251,6 @@ export default class PlayScene extends SuperScene {
   zoomOnLoss() {
     const {level} = this;
     const {enemies, followers, player} = level;
-    const {tileWidth} = this.game.config;
 
     if (followers.length > 1) {
       return;
@@ -994,6 +1259,12 @@ export default class PlayScene extends SuperScene {
     // no followers were ever on the level
     if (followers.length === 0 && !level.lastFollower) {
       return;
+    }
+
+    if (this.level.zoomForLossCompleted && followers.length === 0) {
+      this.timer(() => {
+        this.replaceLostLevel();
+      }, 2000 * this.timeScale).ignoresScenePause = true;
     }
 
     const minDistance = prop('effects.zoomOnLoss.distance');
@@ -1400,6 +1671,7 @@ export default class PlayScene extends SuperScene {
     super.willTransitionFrom(oldScene, transition);
 
     this.oldScene = oldScene;
+    this.willTransition = transition;
 
     if (oldScene && oldScene.transitioning) {
       this.transitioning = true;
@@ -1416,6 +1688,7 @@ export default class PlayScene extends SuperScene {
   didTransitionFrom(oldScene, transition) {
     super.didTransitionFrom(oldScene, transition);
     this.transitioning = null;
+    this.command.ignoreAll('blockade', false);
   }
 
   launchTimeSight() {
