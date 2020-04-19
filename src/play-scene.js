@@ -589,6 +589,10 @@ export default class PlayScene extends SuperScene {
     this.openExits();
   }
 
+  replaceLostLevel() {
+    this.replaceWithSelf(true, null, 'effects.loseTransition');
+  }
+
   enteredTransition(player, transition) {
     if (this.transitioning) {
       return;

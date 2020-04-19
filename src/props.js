@@ -238,6 +238,11 @@ export const propSpecs = {
     frequency: 50,
     lifespan: 500,
   }],
+
+  'effects.loseTransition.transition': [{
+    animation: 'fadeInOut',
+    oldPause: 'everything',
+  }],
 };
 
 propSpecs['scene.camera.lerp'][0] = 0.05;
