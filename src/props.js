@@ -264,6 +264,9 @@ export const tileDefinitions = {
     isStatic: true, // for followers
     isObstacle: true, // for followers
   },
+  F: {
+    image: 'tileGrassRock',
+  },
   '+': {
     image: 'tileGrass',
     // followers

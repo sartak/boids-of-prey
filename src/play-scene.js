@@ -52,11 +52,13 @@ export default class PlayScene extends SuperScene {
   create(config) {
     super.create(config);
 
-    this.loadLevel(config.levelId || 'test');
+    this.loadLevel(config.levelId || 'intro');
     this.flock_amount = 0;
   }
 
   loadLevel(id) {
+    const {tileWidth, tileHeight} = this.game.config;
+
     const level = this.level = super.loadLevel(id);
 
     this.createMap();
@@ -67,6 +69,18 @@ export default class PlayScene extends SuperScene {
     this.level.boundary = this.createBoundary();
 
     this.setupPhysics();
+
+    if (level.scripts) {
+      level.scripts = JSON.parse(JSON.stringify(level.scripts));
+      level.scripts.forEach((script) => {
+        if (script[1] === null) {
+          const glyph = script[2];
+          const tile = level.mapLookups[glyph][0];
+          script[1] = tile.xCoord + tileWidth;
+          script[2] = tile.yCoord - tileHeight;
+        }
+      });
+    }
 
     return level;
   }
@@ -100,6 +114,8 @@ export default class PlayScene extends SuperScene {
     level.map.forEach((row, y) => {
       row.forEach((tile, x) => {
         const [xCoord, yCoord] = this.positionToScreenCoordinate(tile.x, tile.y);
+        tile.xCoord = xCoord;
+        tile.yCoord = yCoord;
 
         let object;
         if (tile.group) {
@@ -619,6 +635,31 @@ export default class PlayScene extends SuperScene {
     }
   }
 
+  playDialog() {
+    const {level} = this;
+    const {scripts, player} = level;
+
+    if (!scripts) {
+      return;
+    }
+
+    scripts.forEach((script) => {
+      if (script.played) {
+        return;
+      }
+
+      const [radius, x, y] = script;
+
+      if (Distance(player.x - x, player.y - y) < radius) {
+        script.played = true;
+
+        // shift off radius
+        script.shift();
+        this.speak(...script);
+      }
+    });
+  }
+
   fixedUpdate(time, dt) {
     this.processInput();
     this.flockFollowers();
@@ -626,8 +667,8 @@ export default class PlayScene extends SuperScene {
     this.zoomOnLoss();
     this.updateVelocities(time, dt);
     this.moveChildren();
+    this.playDialog();
 
-    this['night_amount'] = 1;
     if (!this.spawnedEnemies && this['night_amount'] > 0.99) {
       this.createEnemies();
       this.spawnedEnemies = true;
@@ -648,18 +689,88 @@ export default class PlayScene extends SuperScene {
     });
   }
 
-  speak(text, x, y) {
-    const label = this.add.text(
-      x,
-      y,
-      text,
-      {
-        fontFamily: '"Avenir Next", "Avenir", "Helvetica Neue", "Helvetica", "Arial"',
-        fontSize: 32,
-        color: 'rgb(0, 0, 0)',
+  tweenNightAmount(amount) {
+    const start = this.night_amount;
+    this.tweenPercent(
+      1000,
+      (factor) => {
+        this.night_amount = start * (1 - factor) + factor * amount;
       },
     );
-    label.setDepth(100);
+  }
+
+  speak(x, y, lines, defaults = {
+    inTime: 200, outTime: 200, duration: 1000, extraDelay: 0, dy: -20,
+  }) {
+    let delay = 0;
+
+    lines.forEach((line, i) => {
+      const {
+        duration, inTime, outTime, text, extraDelay,
+        execute, goof, dy,
+      } = {
+        ...defaults,
+        ...(typeof line === 'object' ? line : {text: line}),
+      };
+
+      this.timer(() => {
+        if (execute) {
+          const [method, ...args] = execute;
+          this[method](...args);
+        }
+
+        const label = this.add.text(
+          x,
+          y + dy,
+          text,
+          {
+            fontFamily: '"Avenir Next", "Avenir", "Helvetica Neue", "Helvetica", "Arial"',
+            fontSize: '24px',
+            color: 'rgb(0, 0, 0)',
+          },
+        );
+
+        label.alpha = 0;
+        this.tweenPercent(
+          inTime,
+          (factor) => {
+            label.alpha = factor;
+            label.y = y - dy * (1.0 - factor);
+          },
+          null,
+          0,
+          'Cubic.easeOut',
+        );
+
+        this.timer(() => {
+          if (!goof) {
+            this.tweenPercent(
+              outTime,
+              (factor) => {
+                label.alpha = 1.0 - factor;
+                label.y = y - dy * factor;
+              },
+              () => {
+                label.destroy();
+              },
+              0,
+              'Cubic.easeOut',
+            );
+          } else {
+            this.tweenPercent(
+              Math.abs(outTime * dy / defaults.dy),
+              (factor) => {
+                label.y = y - dy * factor;
+              },
+              () => {
+                label.destroy();
+              },
+            );
+          }
+        }, duration);
+      }, extraDelay + delay);
+      delay += extraDelay + duration + inTime + outTime;
+    });
   }
 
   zoomOnLoss() {
@@ -668,6 +779,11 @@ export default class PlayScene extends SuperScene {
     const {tileWidth} = this.game.config;
 
     if (followers.length > 1) {
+      return;
+    }
+
+    // no followers were ever on the level
+    if (followers.length === 0 && !level.lastFollower) {
       return;
     }
 
