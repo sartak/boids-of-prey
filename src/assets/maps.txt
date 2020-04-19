@@ -315,7 +315,7 @@
   "treasureScript": [
     {"text":"you are stunning!", "extraDelay": 1000, "duration":4000, "execute": ["getTreasure", "stun"]},
     {"text":"press X to stun", "duration":2000},
-    {"text":"that's circle or B on a gamepad", "duration":2000}
+    {"text":"that's square or X on a gamepad", "duration":2000}
   ],
   "onStun": [
     {"execute": ["winLevel"]}

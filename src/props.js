@@ -12,8 +12,8 @@ export const commands = {
   dash: { // ekks
     input: ['keyboard.Z', 'gamepad.A'],
   },
-  stun: { // circle
-    input: ['keyboard.X', 'gamepad.B'],
+  stun: { // square
+    input: ['keyboard.X', 'gamepad.X'],
   },
   /*
   : { // triangle
@@ -237,6 +237,7 @@ export const propSpecs = {
   'effects.loseTransition.transition': [{
     animation: 'fadeInOut',
     oldPause: 'everything',
+    delay: 1000,
   }],
 };
 

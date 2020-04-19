@@ -1899,6 +1899,7 @@ export default class SuperScene extends Phaser.Scene {
 
     const sound = this.sound.add(name);
 
+    sound.timeScale = 1;
     sound.requestedVolume = volume;
 
     sound.setVolume(volume * this.game.volume * prop('scene.soundVolume'));

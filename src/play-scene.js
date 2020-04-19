@@ -676,6 +676,7 @@ export default class PlayScene extends SuperScene {
 
         if (animated) {
           this.camera.shake(50, 0.01);
+          this.playSound('soundBorder');
         }
       }, time * (i + 2));
     });
@@ -692,7 +693,7 @@ export default class PlayScene extends SuperScene {
   openExits() {
     const {level} = this;
 
-    level.blockades.forEach((tiles) => {
+    level.blockades.forEach((tiles, t) => {
       tiles.forEach((tile, i) => {
         this.timer(() => {
           if (tile.object.enableBody) {
@@ -701,7 +702,10 @@ export default class PlayScene extends SuperScene {
             tile.object.body.enable = true;
           }
           tile.block.destroy();
-          this.camera.shake(50, 0.01);
+          if (t === 0) {
+            this.camera.shake(50, 0.01);
+            this.playSound('soundBorder');
+          }
         }, 1000 + 500 * i);
       });
     });
@@ -725,6 +729,7 @@ export default class PlayScene extends SuperScene {
 
     this.replacing = true;
     this.timeScale = 1;
+    this.playSound('soundLose');
 
     this.replaceWithSelf(true, null, {
       name: 'effects.loseTransition',
@@ -852,6 +857,8 @@ export default class PlayScene extends SuperScene {
     const {level} = this;
     const {player} = level;
 
+    this.playSound('soundDash');
+
     if (level.onDash) {
       const script = level.onDash;
       delete level.onDash;
@@ -913,7 +920,7 @@ export default class PlayScene extends SuperScene {
     );
   }
 
-  stun(ax, ay) {
+  stun() {
     const {level} = this;
     const {player} = level;
 
@@ -1030,27 +1037,32 @@ export default class PlayScene extends SuperScene {
       }
     }
 
-    if (player.dash.ax) {
+    if (player.dash.ax || player.dash.ay) {
       ax = 0.1 * ax + 0.9 * player.dash.ax;
       ay = 0.1 * ay + 0.9 * player.dash.ay;
     }
 
     if (ax || ay) {
-      if (ax && ay) {
-        [ax, ay] = NormalizeVector(ax, ay);
-      }
+      [ax, ay] = NormalizeVector(ax, ay);
       const accel = prop('player.acceleration');
+      player.lastAccel = [ax, ay];
       player.body.setAcceleration(ax * accel, ay * accel);
     } else {
       player.body.setAcceleration(0, 0);
     }
 
     if (command.dash.started && this.save.dash && !player.dash.active && !player.dash.cooldown) {
-      // TODO facing direction
+      if (!ax && !ay) {
+        if (player.lastAccel) {
+          [ax, ay] = player.lastAccel;
+        }
+      }
+
       if (!ax && !ay) {
         ax = 1;
         ay = 0;
       }
+
       this.dash(ax, ay);
     }
 
@@ -1155,6 +1167,10 @@ export default class PlayScene extends SuperScene {
 
   tweenNightAmount(amount) {
     const start = this.night_amount;
+    if (amount > 0.99) {
+      this.playSound('soundHowl');
+    }
+
     return this.tweenPercent(
       1000,
       (factor) => {

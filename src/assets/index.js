@@ -2,6 +2,10 @@
 
 import imageBackground from './image/background.png';
 import imageCloud from './image/cloud.png';
+import soundBorder from './sound/border.wav';
+import soundDash from './sound/dash.wav';
+import soundHowl from './sound/howl.wav';
+import soundLose from './sound/lose.wav';
 import spriteEnemyA from './sprite/enemyA.png';
 import spriteFollower from './sprite/follower.png';
 import spritePlayer from './sprite/player.png';
@@ -31,4 +35,8 @@ export const musicAssets = {
 };
 
 export const soundAssets = {
+  soundBorder,
+  soundDash,
+  soundHowl,
+  soundLose,
 };
