@@ -191,14 +191,14 @@ export const propSpecs = {
   'enemy.mass': [1, 0, 100, (value, scene) => scene.level.enemies.forEach((f) => f.body.setMass(value))],
   'enemy.drag': [0.95, 0, 1, (value, scene) => scene.level.enemies.forEach((f) => f.setDrag(value))],
   'enemy.friction': [1, 0, 100, (value, scene) => scene.level.enemies.forEach((f) => f.setFriction(value))],
-  'enemy.bounce': [1, 0, 100, (value, scene) => scene.level.enemies.forEach((f) => f.setBounce(value))],
+  'enemy.bounce': [4, 0, 100, (value, scene) => scene.level.enemies.forEach((f) => f.setBounce(value))],
   'enemy.maxVelocity': [100, 0, 1000, (value, scene) => scene.level.enemies.forEach((f) => f.setMaxVelocity(value))],
   'enemy.velocityLerp': [0.2, 0, 1],
   'enemy.flockAcceleration': [200, 0, 10000],
   'enemy.cohereRadius': [1000, 0, 1000],
   'enemy.cohereFactor': [20, 0, 100],
   'enemy.spreadRadius': [100, 0, 1000],
-  'enemy.spreadFactor': [60, 0, 100],
+  'enemy.spreadFactor': [1000, 0, 1000],
   'enemy.avoidPlayerRadius': [100, 0, 1000],
   'enemy.avoidPlayerFactor': [500, 0, 100],
   'enemy.seekPlayerRadius': [1000, 0, 1000],
@@ -268,16 +268,22 @@ export const tileDefinitions = {
     image: 'tileGrass',
     // followers
   },
+  '[': {
+    image: 'tileCoop',
+    above: 'tileGrass',
+    group: 'coop',
+    isStatic: true,
+    isObstacle: true,
+    isCoop: true,
+    health: 4,
+  },
+  ']': {
+    _inherit: '[',
+  },
   A: {
     image: 'tileGrass',
     enemy: 'spriteEnemyA',
   },
-  /*
-  '{': {
-    _inherit: '#',
-    leftEdge: true,
-  },
-  */
 };
 
 preprocessPropSpecs(propSpecs, particleImages);

@@ -104,8 +104,17 @@ export default class PlayScene extends SuperScene {
         let object;
         if (tile.group) {
           const group = groups[tile.group];
+
+          if (group.above) {
+            this.add.image(xCoord + halfWidth, yCoord + halfHeight, tile.above);
+          }
+
           object = group.group.create(xCoord + halfWidth, yCoord + halfHeight, tile.image);
           group.objects.push(object);
+
+          if (tile.isStatic) {
+            object.setImmovable();
+          }
 
           if (tile.isCircle) {
             object.setCircle(radius);
@@ -290,25 +299,88 @@ export default class PlayScene extends SuperScene {
 
     physics.add.overlap(player, groups.transition.group, this.enteredTransition, null, this);
     physics.add.collider(player, groups.rock.group);
+    physics.add.collider(player, groups.coop.group, this.playerCollideCoop, null, this);
+    physics.add.collider(player, followerGroup, this.playerCollideFollower, null, this);
     physics.add.overlap(player, enemyGroup, this.playerKillEnemy, null, this);
 
-    physics.add.collider(followerGroup, player);
-    physics.add.collider(followerGroup, groups.rock.group);
-    physics.add.collider(followerGroup, followerGroup);
-    physics.add.collider(followerGroup, boundary);
+    physics.add.collider(followerGroup, groups.rock.group, this.justCoolItDown, null, this);
+    physics.add.collider(followerGroup, groups.coop.group, this.justCoolItDown, null, this);
+    physics.add.collider(followerGroup, followerGroup, this.justCoolItDown, null, this);
+    physics.add.collider(followerGroup, boundary, this.justCoolItDown, null, this);
     // not needed because world collide
     // physics.add.collider(followerGroup, groups.transition.group);
 
-    physics.add.collider(enemyGroup, player);
-    physics.add.collider(enemyGroup, groups.rock.group);
-    physics.add.collider(enemyGroup, enemyGroup);
-    physics.add.collider(enemyGroup, boundary);
+    physics.add.collider(enemyGroup, groups.rock.group, this.justCoolItDown, null, this);
+    physics.add.collider(enemyGroup, groups.coop.group, this.enemyCollideCoop, null, this);
+    physics.add.collider(enemyGroup, enemyGroup, this.justCoolItDown, null, this);
+    physics.add.collider(enemyGroup, boundary, this.justCoolItDown, null, this);
     physics.add.overlap(enemyGroup, followerGroup, this.enemyKillFollower, null, this);
   }
 
-  enemyKillFollower(enemy, follower) {
+  damageCoop(coop) {
+    coop.tile.health -= 1;
+    if (coop.tile.health < 0) {
+      coop.destroy();
+    }
+
+    const reduction = 1 / this.level.groups.coop.health;
+    let prevFactor = 0;
+    this.tweenPercent(
+      100,
+      (factor) => {
+        coop.alpha -= (factor - prevFactor) * reduction;
+        prevFactor = factor;
+      },
+    );
+  }
+
+  enemyCollideCoop(enemy, coop) {
+    this.damageCoop(coop);
+    enemy.body.setAcceleration(0, 0);
+    enemy.cooldown = true;
+    this.timer(() => {
+      enemy.cooldown = false;
+    }, 1000);
+  }
+
+  playerCollideCoop(player, coop) {
+    if (player.dash.active) {
+      this.damageCoop(coop);
+    }
+  }
+
+  playerCollideFollower(player, follower) {
+    this.justCoolItDown(player, follower);
+
+    if (player.dash.active) {
+      this.killFollower(follower);
+    }
+  }
+
+  justCoolItDown(a, b) {
+    if (a.body && a.body.setAcceleration) {
+      a.cooldown = true;
+      a.body.setAcceleration(0, 0);
+    }
+
+    if (b.body && b.body.setAcceleration) {
+      b.body.setAcceleration(0, 0);
+      b.cooldown = true;
+    }
+
+    this.timer(() => {
+      a.cooldown = false;
+      b.cooldown = false;
+    }, 1000);
+  }
+
+  killFollower(follower) {
     const {level} = this;
     level.followers = level.followers.filter((f) => f !== follower);
+    if (level.followers.length === 0) {
+      level.lastFollower = follower;
+    }
+
     follower.destroy();
 
     const reduction = 1 / level.followerCount;
@@ -320,6 +392,10 @@ export default class PlayScene extends SuperScene {
         prevFactor = factor;
       },
     );
+  }
+
+  enemyKillFollower(enemy, follower) {
+    this.killFollower(follower);
   }
 
   playerKillEnemy(player, enemy) {
@@ -572,12 +648,26 @@ export default class PlayScene extends SuperScene {
     });
   }
 
+  speak(text, x, y) {
+    const label = this.add.text(
+      x,
+      y,
+      text,
+      {
+        fontFamily: '"Avenir Next", "Avenir", "Helvetica Neue", "Helvetica", "Arial"',
+        fontSize: 32,
+        color: 'rgb(0, 0, 0)',
+      },
+    );
+    label.setDepth(100);
+  }
+
   zoomOnLoss() {
     const {level} = this;
     const {enemies, followers, player} = level;
     const {tileWidth} = this.game.config;
 
-    if (followers.length !== 1) {
+    if (followers.length > 1) {
       return;
     }
 
@@ -588,6 +678,8 @@ export default class PlayScene extends SuperScene {
 
     if (enemies.length === 0) {
       isSafe = true;
+    } else if (followers.length === 0) {
+      min = [0, level.lastFollower, null];
     } else {
       for (let f = 0; f < followers.length; f += 1) {
         const follower = followers[f];
@@ -617,6 +709,7 @@ export default class PlayScene extends SuperScene {
 
       this.level.unzoomForLoss = true;
       this.level.zoomedForLoss = false;
+      this.level.zoomForLossCompleted = false;
 
       this.unzoomStartTimer = this.timer(() => {
         if (this.level.zoomedForLoss) {
@@ -663,6 +756,7 @@ export default class PlayScene extends SuperScene {
       }
 
       if (!this.level.zoomedForLoss) {
+        this.level.zoomForLossCompleted = false;
         this.pauseEverythingForTransition();
         this.level.zoomedForLoss = true;
         const panDuration = prop('effects.zoomOnLoss.pan_duration');
@@ -689,6 +783,7 @@ export default class PlayScene extends SuperScene {
         this.timer(() => {
           this.timeScale = prop('effects.zoomOnLoss.time_scale');
           this.unpauseEverythingForTransition();
+          this.level.zoomForLossCompleted = true;
         }, Math.max(panDuration, zoomDuration)).ignoresScenePause = true;
       }
     }
@@ -728,6 +823,10 @@ export default class PlayScene extends SuperScene {
     return this.physics.overlapRect(x - r / 2, y - r / 2, r, r, false, true).map((body) => body.gameObject).filter((object) => object.tile && object.tile.isObstacle);
   }
 
+  noncoopObstaclesNearPoint(x, y, r) {
+    return this.physics.overlapRect(x - r / 2, y - r / 2, r, r, false, true).map((body) => body.gameObject).filter((object) => object.tile && object.tile.isObstacle && !object.tile.isCoop);
+  }
+
   flockFollowers() {
     const {level} = this;
     const {followers, player} = level;
@@ -754,6 +853,10 @@ export default class PlayScene extends SuperScene {
     const killerVelocity = prop('follower.killerVelocity');
 
     followers.forEach((follower) => {
+      if (follower.cooldown) {
+        return;
+      }
+
       const fx = follower.x;
       const fy = follower.y;
 
@@ -865,6 +968,10 @@ export default class PlayScene extends SuperScene {
     const victimVelocity = prop('enemy.victimVelocity');
 
     enemies.forEach((enemy) => {
+      if (enemy.cooldown) {
+        return;
+      }
+
       const fx = enemy.x;
       const fy = enemy.y;
 
@@ -915,7 +1022,7 @@ export default class PlayScene extends SuperScene {
       }
 
       if (obstacleFactor > 0) {
-        const os = this.obstaclesNearPoint(fx, fy, obstacleRadius);
+        const os = this.noncoopObstaclesNearPoint(fx, fy, obstacleRadius);
         const v = AvoidObjects(os, fx, fy, obstacleRadius);
         if (v) {
           targetX += v[0] * obstacleFactor;
