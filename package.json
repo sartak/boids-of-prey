@@ -1,9 +1,9 @@
 {
-  "name": "ld46",
+  "name": "boids-of-prey",
   "homepage": "/",
   "version": "0.1.0",
   "productionDisplay": {
-    "displayName": "ld46",
+    "displayName": "Boids of Prey",
     "analyticsId": "UA-21253667-5",
     "authorName": "@sartak",
     "authorURL": "https://sartak.org",
@@ -18,7 +18,7 @@
     "themePre": "",
     "themeItalic": "\"Keep it alive\"",
     "themePost": "",
-    "repoURL": "https://github.com/sartak/ld46"
+    "repoURL": "https://github.com/sartak/boids-of-prey"
   },
   "developmentDisplay": {
     "links": [
