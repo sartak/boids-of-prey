@@ -726,21 +726,52 @@ export default class PlayScene extends SuperScene {
     );
   }
 
+  fakeStun(entity) {
+    if (entity === this.level.player) {
+      return;
+    }
+
+    entity.cooldown = true;
+    entity.body.setAcceleration(0, 0);
+
+    entity.stunAlpha = this.tween(
+      null,
+      entity,
+      {
+        alpha: 0.5,
+        duration: 200,
+      },
+    );
+
+    entity.stunRotate = this.tween(
+      null,
+      entity,
+      {
+        delay: 200,
+        rotation: 360,
+        duration: 1000,
+        onComplete: () => {
+          entity.stunRecover = this.tween(
+            null, entity,
+            {
+              alpha: 1,
+              duration: 200,
+            },
+          );
+          entity.cooldown = false;
+        },
+      },
+    );
+  }
+
   justCoolItDown(a, b) {
     if (a.body && a.body.setAcceleration) {
-      a.cooldown = true;
-      a.body.setAcceleration(0, 0);
+      this.fakeStun(a);
     }
 
     if (b.body && b.body.setAcceleration) {
-      b.body.setAcceleration(0, 0);
-      b.cooldown = true;
+      this.fakeStun(b);
     }
-
-    this.timer(() => {
-      a.cooldown = false;
-      b.cooldown = false;
-    }, 1000);
   }
 
   killFollower(follower) {
