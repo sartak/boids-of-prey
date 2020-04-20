@@ -250,9 +250,20 @@ export const tileDefinitions = {
   '@': null,
   '+': null,
   $: null,
-  F: null,
+  F: {
+    image: 'spriteFarmer',
+    group: 'farmer',
+    isStatic: true,
+    isObstacle: true,
+  },
 
   '*': {
+    image: 'tileWall',
+    group: 'wall',
+    isStatic: true,
+    isObstacle: true,
+  },
+  0: {
     image: 'tileGrassRock',
     group: 'rock',
     isStatic: true,

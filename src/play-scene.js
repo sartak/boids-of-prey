@@ -73,6 +73,8 @@ export default class PlayScene extends SuperScene {
     this.save.levelId = levelId;
     this.save.levelPlayer = config.player;
     this.saveState();
+
+    this.music = 'musicPeace';
   }
 
   getTreasure(name) {
@@ -94,6 +96,9 @@ export default class PlayScene extends SuperScene {
       return;
     }
 
+    this.camera.shake(100, 0.01);
+    this.playSound('soundCoopHit');
+
     const [xCoord, yCoord] = this.positionToScreenCoordinate(tile.x, tile.y);
 
     level.treasure = treasureGroup.create(xCoord + halfWidth, yCoord + halfHeight, 'tileTreasureClosed');
@@ -107,6 +112,7 @@ export default class PlayScene extends SuperScene {
 
     treasure.collected = true;
     treasure.setTexture('tileTreasureOpen');
+    this.playSound('soundTreasure');
     this.speak(x - tileWidth, y + tileHeight, this.level.treasureScript);
   }
 
@@ -235,6 +241,13 @@ export default class PlayScene extends SuperScene {
       }
     });
 
+    const brickwork = {
+      left: [],
+      right: [],
+      up: [],
+      down: [],
+    };
+
     level.map.forEach((row, y) => {
       row.forEach((tile, x) => {
         const [xCoord, yCoord] = this.positionToScreenCoordinate(tile.x, tile.y);
@@ -242,7 +255,25 @@ export default class PlayScene extends SuperScene {
         tile.yCoord = yCoord;
 
         let object;
-        if (tile.group) {
+        if (tile.group === 'wall') {
+          let g;
+          if (x === 0) {
+            g = 'left';
+          } else if (y === 0) {
+            g = 'up';
+          } else if (x === level.widthInTiles - 1) {
+            g = 'right';
+          } else if (y === level.heightInTiles - 1) {
+            g = 'down';
+          }
+
+          if (g) {
+            brickwork[g].push(tile);
+            object = this.add.image(xCoord + halfWidth, yCoord + halfHeight, tile.image);
+          } else {
+            object = this.createTileForGroup(tile.group, xCoord + halfWidth, yCoord + halfHeight);
+          }
+        } else if (tile.group) {
           object = this.createTileForGroup(tile.group, xCoord + halfWidth, yCoord + halfHeight);
         } else if (tile.image) {
           object = this.add.image(xCoord + halfWidth, yCoord + halfHeight, tile.image);
@@ -253,9 +284,55 @@ export default class PlayScene extends SuperScene {
         }
       });
     });
+
+    Object.entries(brickwork).forEach(([direction, tiles]) => {
+      let axis;
+      let other;
+      if (direction === 'left' || direction === 'right') {
+        axis = 'y';
+        other = 'x';
+      } else {
+        axis = 'x';
+        other = 'y';
+      }
+      const t = [...tiles];
+      t.sort((a, b) => a[axis] - b[axis]);
+
+      const gs = [];
+      let g = [];
+      t.forEach((tile) => {
+        if (!g.length) {
+          g.push(tile);
+          return;
+        }
+        const last = g[g.length - 1];
+        if (tile[axis] === last[axis] + 1) {
+          g.push(tile);
+        } else {
+          gs.push(g);
+          g = [tile];
+        }
+      });
+
+      if (g.length) {
+        gs.push(g);
+      }
+
+      gs.forEach((gg) => {
+        const first = gg[0];
+        const last = gg[gg.length - 1];
+        const x = tileWidth * first.x;
+        const y = tileHeight * first.y;
+        const w = tileWidth * (last.x + 1) - x;
+        const h = tileHeight * (last.y + 1) - y;
+        const wall = this.add.rectangle(x + w * 0.5, y + h * 0.5, w, h);
+        groups.wall.group.add(wall);
+      });
+    });
   }
 
   createBoundary() {
+    return;
     const {level} = this;
     const {width: levelWidth, height: levelHeight} = level;
 
@@ -309,7 +386,7 @@ export default class PlayScene extends SuperScene {
     player.setMaxVelocity(prop('player.maxVelocity'));
     player.setDamping(true);
     player.setFriction(prop('player.friction'));
-    player.setCircle((halfWidth + halfHeight) / 2);
+    player.setSize(18, 18, true);
 
     player.dash = {
       active: false,
@@ -355,8 +432,8 @@ export default class PlayScene extends SuperScene {
       follower.setFriction(friction);
       follower.setMaxVelocity(maxVelocity);
       follower.targetMaxVelocity = maxVelocity;
-      follower.setCircle(radius);
       follower.isFollower = true;
+      follower.setSize(18, 18, true);
 
       return follower;
     });
@@ -398,8 +475,24 @@ export default class PlayScene extends SuperScene {
           enemy.setFriction(friction);
           enemy.setMaxVelocity(maxVelocity);
           enemy.targetMaxVelocity = maxVelocity;
-          enemy.setCircle(radius);
           enemy.isEnemy = true;
+          enemy.anims.play('spriteEnemyAWalk');
+          enemy.setSize(18, 18, true);
+
+          // screws acceleration
+          /*
+          this.tween(
+            null,
+            enemy,
+            {
+              dy: 5,
+              duration: 500,
+              yoyo: true,
+              loop: -1,
+              ease: 'Quad.easeInOut',
+            },
+          );
+          */
 
           return enemy;
         });
@@ -415,6 +508,21 @@ export default class PlayScene extends SuperScene {
   }
 
   setupAnimations() {
+    this.anims.create({
+      key: 'spriteEnemyAWalk',
+      frames: [
+        {
+          key: 'spriteEnemyA',
+          frame: 0,
+        },
+        {
+          key: 'spriteEnemyA',
+          frame: 1,
+        },
+      ],
+      frameRate: 6,
+      repeat: -1,
+    });
   }
 
   setupPhysics() {
@@ -426,12 +534,16 @@ export default class PlayScene extends SuperScene {
 
     physics.add.overlap(player, groups.transition.group, this.enteredTransition, null, this);
     physics.add.collider(player, groups.rock.group);
+    physics.add.collider(player, groups.farmer.group);
+    physics.add.collider(player, groups.wall.group);
     physics.add.collider(player, groups.coop.group, this.playerCollideCoop, null, this);
     physics.add.collider(player, followerGroup, this.playerCollideFollower, null, this);
     physics.add.overlap(player, enemyGroup, this.playerKillEnemy, null, this);
     physics.add.collider(player, treasureGroup, this.collectTreasure, null, this);
 
     physics.add.collider(followerGroup, groups.rock.group, this.justCoolItDown, null, this);
+    physics.add.collider(followerGroup, groups.farmer.group, this.justCoolItDown, null, this);
+    physics.add.collider(followerGroup, groups.wall.group, this.justCoolItDown, null, this);
     physics.add.collider(followerGroup, groups.coop.group, this.justCoolItDown, null, this);
     physics.add.collider(followerGroup, followerGroup, this.justCoolItDown, null, this);
     physics.add.collider(followerGroup, boundary, this.justCoolItDown, null, this);
@@ -440,6 +552,7 @@ export default class PlayScene extends SuperScene {
     // physics.add.collider(followerGroup, groups.transition.group);
 
     physics.add.collider(enemyGroup, groups.rock.group, this.justCoolItDown, null, this);
+    physics.add.collider(enemyGroup, groups.wall.group, this.justCoolItDown, null, this);
     physics.add.collider(enemyGroup, groups.coop.group, this.enemyCollideCoop, null, this);
     physics.add.collider(enemyGroup, enemyGroup, this.justCoolItDown, null, this);
     physics.add.collider(enemyGroup, boundary, this.justCoolItDown, null, this);
@@ -447,25 +560,42 @@ export default class PlayScene extends SuperScene {
     physics.add.overlap(enemyGroup, followerGroup, this.enemyKillFollower, null, this);
   }
 
-  damageCoop(coop) {
+  damageCoop(coop, damager) {
+    const fx = coop.x - damager.x;
+    const fy = coop.y - damager.y;
+
+    let dx = 0;
+    let dy = 0;
+
+    if (Math.abs(fx) > Math.abs(fy)) {
+      dx = fx < 0 ? -2 : 2;
+    } else {
+      dy = fy < 0 ? -2 : 2;
+    }
+
     coop.tile.health -= 1;
     if (coop.tile.health < 0) {
       coop.destroy();
+      this.playSound('soundCoopBreak');
+    } else {
+      this.playSound('soundCoopHit');
     }
 
-    const reduction = 1 / this.level.groups.coop.health;
+    const reduction = 0.5 / this.level.groups.coop.health;
     let prevFactor = 0;
     this.tweenPercent(
       100,
       (factor) => {
         coop.alpha -= (factor - prevFactor) * reduction;
+        coop.x += (factor - prevFactor) * dx;
+        coop.y += (factor - prevFactor) * dy;
         prevFactor = factor;
       },
     );
   }
 
   enemyCollideCoop(enemy, coop) {
-    this.damageCoop(coop);
+    this.damageCoop(coop, enemy);
     enemy.body.setAcceleration(0, 0);
     enemy.cooldown = true;
     this.timer(() => {
@@ -475,7 +605,7 @@ export default class PlayScene extends SuperScene {
 
   playerCollideCoop(player, coop) {
     if (player.dash.active) {
-      this.damageCoop(coop);
+      this.damageCoop(coop, player);
     }
   }
 
@@ -484,15 +614,15 @@ export default class PlayScene extends SuperScene {
 
     if (player.dash.active) {
       this.stopDash();
-      this.buttobasu(player, follower);
+      this.buttobasu(player, follower, true);
       this.killFollower(follower);
     }
   }
 
   sleep(duration) {
-    this.pauseEverythingForTransition();
+    // this.pauseEverythingForTransition();
     this.timer(() => {
-      this.unpauseEverythingForTransition();
+      // this.unpauseEverythingForTransition();
     }, duration).ignoresScenePause = true;
   }
 
@@ -525,7 +655,7 @@ export default class PlayScene extends SuperScene {
     this.impact(...args);
   }
 
-  buttobasu(player, entity) {
+  buttobasu(player, entity, isFollower) {
     entity.disableBody();
 
     const [ex, ey] = NormalizeVector(entity.x - player.x, entity.y - player.y);
@@ -545,7 +675,14 @@ export default class PlayScene extends SuperScene {
 
     this.camera.shake(100, 0.005);
 
-    // this.timer(() => {
+    this.playSound('soundCoopHit');
+    this.timer(() => {
+      if (isFollower) {
+        this.playSound('soundDashFollower');
+      } else {
+        this.playSound('soundDashKill');
+      }
+    }, 80);
 
     this.tween(
       null,
@@ -553,9 +690,9 @@ export default class PlayScene extends SuperScene {
       {
         alpha: 0,
         delay: 40,
-        duration: 500,
-        dx: 300 * dx,
-        dy: 300 * dy,
+        duration: 700,
+        dx: 600 * dx,
+        dy: 600 * dy,
         scaleX: 3,
         scaleY: 3,
         rotation: dx < 0 ? -300 : 300,
@@ -627,6 +764,7 @@ export default class PlayScene extends SuperScene {
   enemyKillFollower(enemy, follower) {
     this.butsu(enemy, follower);
     this.killFollower(follower);
+    this.playSound('soundMurder');
   }
 
   playerKillEnemy(player, enemy) {
@@ -638,10 +776,12 @@ export default class PlayScene extends SuperScene {
       this.buttobasu(player, enemy);
     } else {
       this.butsu(player, enemy);
+      this.playSound('soundHit');
     }
 
     if (level.enemies.length === 0) {
       this.timer(() => {
+        this.playSound('soundWin');
         this.winLevel();
       }, 1000);
     }
@@ -659,10 +799,6 @@ export default class PlayScene extends SuperScene {
 
     const time = animated ? 500 : 0;
 
-    if (time) {
-      this.command.ignoreAll('blockade', true);
-    }
-
     tiles.forEach((tile, i) => {
       this.timer(() => {
         const {xCoord, yCoord} = tile;
@@ -671,7 +807,7 @@ export default class PlayScene extends SuperScene {
         } else {
           tile.object.body.enable = false;
         }
-        const object = this.createTileForGroup('rock', xCoord + halfWidth, yCoord + halfHeight);
+        const object = this.createTileForGroup('wall', xCoord + halfWidth, yCoord + halfHeight);
         tile.block = object;
 
         if (animated) {
@@ -712,6 +848,9 @@ export default class PlayScene extends SuperScene {
   }
 
   winLevel() {
+    this.music = 'musicPeace';
+    this.playMusic();
+
     if (this.level.glowEmitter) {
       this.level.glowEmitter.stop();
     }
@@ -828,6 +967,11 @@ export default class PlayScene extends SuperScene {
   }
 
   musicName() {
+    if (this.level && this.level.levelId === 'last') {
+      return 'musicWin';
+    }
+
+    return this.music;
   }
 
   firstUpdate(time, dt) {
@@ -881,6 +1025,8 @@ export default class PlayScene extends SuperScene {
       {
         scale: {start: 0.5, end: 0},
         alpha: {start: 1, end: 0},
+        speedX: -40 * ax,
+        speedY: -40 * ay,
         onAdd: (particles, emitter) => {
           dashEmitter = emitter;
           emitter.x.propertyValue = player.x + tileWidth * dy;
@@ -923,6 +1069,8 @@ export default class PlayScene extends SuperScene {
   stun() {
     const {level} = this;
     const {player} = level;
+
+    this.playSound('soundStun');
 
     if (level.onStun) {
       const script = level.onStun;
@@ -1098,14 +1246,21 @@ export default class PlayScene extends SuperScene {
 
   fixedUpdate(time, dt) {
     this.processInput();
-    this.flockFollowers();
-    this.flockEnemies();
+    this.p = ((this.p || 0) + 1) % 3;
+    this.flockFollowers(this.p);
+    this.flockEnemies(this.p);
     this.zoomOnLoss();
     this.updateVelocities(time, dt);
     this.moveChildren();
     this.playDialog();
 
-    if (!this.spawningEnemies && this['night_amount'] > 0.99 && time > 1000) {
+    const {player} = this.level;
+    if (!this.transitioning && (player.x < 0 || player.y < 0 || player.x > this.level.width || player.y > this.level.height)) {
+      player.x = this.level.width * 0.5;
+      player.y = this.level.height * 0.5;
+    }
+
+    if (!this.spawningEnemies && this['night_amount'] > 0.99 && time > 1000 && !this.suppressShit) {
       this.spawningEnemies = true;
 
       this.particleSystem(
@@ -1135,6 +1290,8 @@ export default class PlayScene extends SuperScene {
         this.level.enemies.forEach((enemy) => {
           enemy.alpha = 0;
           enemy.cooldown = true;
+          this.music = 'musicWar';
+          this.playMusic();
           this.tween(
             null,
             enemy,
@@ -1168,7 +1325,12 @@ export default class PlayScene extends SuperScene {
   tweenNightAmount(amount) {
     const start = this.night_amount;
     if (amount > 0.99) {
-      this.playSound('soundHowl');
+      if (!this.suppressShit) {
+        this.music = null;
+        this.playMusic();
+        this.playSound('soundHowl');
+        this.command.ignoreAll('blockade', true);
+      }
     }
 
     return this.tweenPercent(
@@ -1190,14 +1352,14 @@ export default class PlayScene extends SuperScene {
   }
 
   speak(x, y, lines, defaults = {
-    inTime: 200, outTime: 200, duration: 1000, extraDelay: 0, dy: -20,
+    inTime: 200, outTime: 200, duration: 1000, extraDelay: 0, dy: -20, noOut: false,
   }) {
     let delay = 0;
 
     lines.forEach((line, i) => {
       const {
         duration, inTime, outTime, text, extraDelay,
-        execute, goof, dy,
+        execute, goof, dy, noOut,
       } = {
         ...defaults,
         ...(typeof line === 'object' ? line : {text: line}),
@@ -1232,6 +1394,10 @@ export default class PlayScene extends SuperScene {
           0,
           'Cubic.easeOut',
         );
+
+        if (noOut) {
+          return;
+        }
 
         this.timer(() => {
           if (!goof) {
@@ -1439,7 +1605,7 @@ export default class PlayScene extends SuperScene {
     return this.physics.overlapRect(x - r / 2, y - r / 2, r, r, false, true).map((body) => body.gameObject).filter((object) => object.tile && object.tile.isObstacle && !object.tile.isCoop);
   }
 
-  flockFollowers() {
+  flockFollowers(subgroup) {
     const {level} = this;
     const {followers, player} = level;
 
@@ -1464,7 +1630,10 @@ export default class PlayScene extends SuperScene {
     const killerAcceleration = prop('follower.killerAcceleration');
     const killerVelocity = prop('follower.killerVelocity');
 
-    followers.forEach((follower) => {
+    followers.forEach((follower, sg) => {
+      if (sg % 3 != subgroup) {
+        return;
+      }
       if (follower.cooldown) {
         return;
       }
@@ -1552,7 +1721,7 @@ export default class PlayScene extends SuperScene {
     });
   }
 
-  flockEnemies() {
+  flockEnemies(subgroup) {
     const {level} = this;
     const {followers, enemies, player} = level;
 
@@ -1579,7 +1748,10 @@ export default class PlayScene extends SuperScene {
     const victimAcceleration = prop('enemy.victimAcceleration');
     const victimVelocity = prop('enemy.victimVelocity');
 
-    enemies.forEach((enemy) => {
+    enemies.forEach((enemy, sg) => {
+      if (sg % 3 !== subgroup) {
+        return;
+      }
       if (enemy.cooldown) {
         return;
       }
@@ -1681,6 +1853,7 @@ export default class PlayScene extends SuperScene {
 
   willTransitionTo(newScene, transition) {
     super.willTransitionTo(newScene, transition);
+    this.suppressShit = true;
   }
 
   willTransitionFrom(oldScene, transition) {
@@ -1705,6 +1878,7 @@ export default class PlayScene extends SuperScene {
     super.didTransitionFrom(oldScene, transition);
     this.transitioning = null;
     this.command.ignoreAll('blockade', false);
+    this.playMusic();
   }
 
   launchTimeSight() {

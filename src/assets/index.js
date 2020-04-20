@@ -2,11 +2,25 @@
 
 import imageBackground from './image/background.png';
 import imageCloud from './image/cloud.png';
+import musicPeace from './music/peace.mp3';
+import musicWar from './music/war.mp3';
+import musicWin from './music/win.mp3';
 import soundBorder from './sound/border.wav';
+import soundCoopBreak from './sound/coopbreak.wav';
+import soundCoopHit from './sound/coop.wav';
 import soundDash from './sound/dash.wav';
+import soundDashFollower from './sound/dashfollower.wav';
+import soundDashKill from './sound/dashkill.wav';
+import soundHit from './sound/hit.wav';
 import soundHowl from './sound/howl.wav';
+import soundKill from './sound/kill.wav';
 import soundLose from './sound/lose.wav';
+import soundMurder from './sound/murder.wav';
+import soundStun from './sound/stun.wav';
+import soundTreasure from './sound/treasure.wav';
+import soundWin from './sound/win.wav';
 import spriteEnemyA from './sprite/enemyA.png';
+import spriteFarmer from './sprite/farmer.png';
 import spriteFollower from './sprite/follower.png';
 import spritePlayer from './sprite/player.png';
 import tileCoop from './tile/coop.png';
@@ -14,16 +28,23 @@ import tileGrass from './tile/grass.png';
 import tileGrassRock from './tile/grassrock.png';
 import tileTreasureClosed from './tile/treasure-closed.png';
 import tileTreasureOpen from './tile/treasure-open.png';
+import tileWall from './tile/wall.png';
 
 export const imageAssets = {
   imageBackground,
   imageCloud,
   tileGrass,
   tileGrassRock,
+  tileWall,
 };
 
 export const spriteAssets = {
-  spriteEnemyA,
+  spriteEnemyA: {
+    file: spriteEnemyA,
+    frameWidth: 26,
+    frameHeight: 24,
+  },
+  spriteFarmer,
   spriteFollower,
   spritePlayer,
   tileCoop,
@@ -32,11 +53,24 @@ export const spriteAssets = {
 };
 
 export const musicAssets = {
+  musicPeace,
+  musicWar,
+  musicWin,
 };
 
 export const soundAssets = {
   soundBorder,
+  soundCoopBreak,
+  soundCoopHit,
   soundDash,
+  soundDashFollower,
+  soundDashKill,
+  soundHit,
   soundHowl,
+  soundKill,
   soundLose,
+  soundMurder,
+  soundStun,
+  soundTreasure,
+  soundWin,
 };
