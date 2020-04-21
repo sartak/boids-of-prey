@@ -327,12 +327,12 @@ export default class PlayScene extends SuperScene {
         const h = tileHeight * (last.y + 1) - y;
         const wall = this.add.rectangle(x + w * 0.5, y + h * 0.5, w, h);
         groups.wall.group.add(wall);
+        wall.isWall = true;
       });
     });
   }
 
   createBoundary() {
-    return;
     const {level} = this;
     const {width: levelWidth, height: levelHeight} = level;
 
@@ -1629,11 +1629,11 @@ export default class PlayScene extends SuperScene {
   }
 
   obstaclesNearPoint(x, y, r) {
-    return this.physics.overlapRect(x - r / 2, y - r / 2, r, r, false, true).map((body) => body.gameObject).filter((object) => object.tile && object.tile.isObstacle);
+    return this.physics.overlapRect(x - r / 2, y - r / 2, r, r, false, true).map((body) => body.gameObject).filter((object) => object.isWall || (object.tile && object.tile.isObstacle));
   }
 
   noncoopObstaclesNearPoint(x, y, r) {
-    return this.physics.overlapRect(x - r / 2, y - r / 2, r, r, false, true).map((body) => body.gameObject).filter((object) => object.tile && object.tile.isObstacle && !object.tile.isCoop);
+    return this.physics.overlapRect(x - r / 2, y - r / 2, r, r, false, true).map((body) => body.gameObject).filter((object) => object.isWall || (object.tile && object.tile.isObstacle && !object.tile.isCoop));
   }
 
   flockFollowers(subgroup) {
